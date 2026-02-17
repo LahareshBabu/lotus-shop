@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* 🌟 IVY LEAGUE MOTION ENGINE 🌟 */
+
+/* 1. Blur-Up Image Loading */
+.image-loading {
+  opacity: 0;
+  scale: 0.95;
+  filter: blur(10px);
+  transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.image-loaded {
+  opacity: 1;
+  scale: 1;
+  filter: blur(0px);
+}
+
+/* 2. Checkmark Pop Animation */
+@keyframes check-pop {
+  0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+  70% { transform: scale(1.2) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+.animate-check {
+  animation: check-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* 3. Hero Entrance Animations */
+@keyframes slide-up-fade {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-hero-1 { animation: slide-up-fade 0.8s ease-out forwards; opacity: 0; animation-delay: 0.1s; }
+.animate-hero-2 { animation: slide-up-fade 0.8s ease-out forwards; opacity: 0; animation-delay: 0.3s; }
+.animate-hero-3 { animation: slide-up-fade 0.8s ease-out forwards; opacity: 0; animation-delay: 0.5s; }
+.animate-hero-btn { animation: slide-up-fade 0.8s ease-out forwards; opacity: 0; animation-delay: 0.7s; }
+
+/* 4. Scroll Reveal Class */
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: all 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-on-scroll.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 🌟 5. AESTHETIC HEART BURST (TUNED) 🌟 */
+.heart-particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-size: 0px; 
+  pointer-events: none;
+  z-index: 50; 
+  line-height: 1;
+}
+
+@keyframes heart-burst {
+  0% {
+    transform: translate(-50%, -50%);
+    font-size: 0px;
+    opacity: 0;
+  }
+  15% {
+    /* Pop to visible size quickly */
+    font-size: 14px; 
+    opacity: 1;
+  }
+  100% {
+    /* Drift slowly to destination and fade out */
+    transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty)));
+    font-size: 10px; /* Slight shrink */
+    opacity: 0;
+  }
+}
+
+.animate-heart-burst {
+  /* Slower duration (0.9s) and "Soft" easing for that dreamy aesthetic */
+  animation: heart-burst 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Colors */
+.hp-red { color: #ef4444; filter: drop-shadow(0 0 1px rgba(239, 68, 68, 0.3)); }
+.hp-gold { color: #f59e0b; filter: drop-shadow(0 0 1px rgba(245, 158, 11, 0.3)); }
+
+/* 💥 TIGHTER TRAJECTORIES (Less travel distance) 💥 */
+
+/* Outer Ring (Reduced to 28px distance - was 50px) */
+.p-1 { --tx: 0px; --ty: -28px; }    /* Top */
+.p-2 { --tx: 20px; --ty: -20px; }   /* Top-Right */
+.p-3 { --tx: 28px; --ty: 0px; }     /* Right */
+.p-4 { --tx: 20px; --ty: 20px; }    /* Bottom-Right */
+.p-5 { --tx: 0px; --ty: 28px; }     /* Bottom */
+.p-6 { --tx: -20px; --ty: 20px; }   /* Bottom-Left */
+.p-7 { --tx: -28px; --ty: 0px; }    /* Left */
+.p-8 { --tx: -20px; --ty: -20px; }  /* Top-Left */
+
+/* Inner Ring (Reduced to 14px distance - was 25px) */
+/* Added slightly different scale to make them feel "further away" or smaller */
+.p-9  { --tx: 0px; --ty: -14px; font-size: 10px !important; }
+.p-10 { --tx: 14px; --ty: 0px;  font-size: 10px !important; }
+.p-11 { --tx: 0px; --ty: 14px;  font-size: 10px !important; }
+.p-12 { --tx: -14px; --ty: 0px; font-size: 10px !important; }
