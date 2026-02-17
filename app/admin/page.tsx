@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import RevenueChart from './chart/RevenueChart' // 🌟 IMPORT THE CHART
 
 // CONFIGURATION
 const supabaseUrl = "https://fwyliqsazdyprlkemavu.supabase.co"
@@ -118,7 +119,6 @@ export default function AdminPage() {
   if (currentUserEmail !== MY_ADMIN_EMAIL && currentUserEmail !== "Checking...") return <div className="min-h-screen bg-[#1a0505] text-red-500 flex items-center justify-center">ACCESS DENIED</div>
   if (loading) return <div className="min-h-screen bg-[#1a0505] flex items-center justify-center text-[#c5a059]">Loading...</div>
   
-  // Check if we are viewing history
   const isHistoryMode = !!historyCycleId || !!historyMonth;
 
   return (
@@ -145,7 +145,6 @@ export default function AdminPage() {
           </div>
           <div className="flex gap-4">
               
-              {/* 🌟 FIXED: EXACT STYLE MATCH WITH ARROW 🌟 */}
               {isHistoryMode && (
                   <Link href="/admin" className="text-xs uppercase tracking-widest text-[#c5a059] border border-[#c5a059] px-6 py-2 rounded hover:bg-[#c5a059] hover:text-[#1a0505] transition-all">
                       ← Back to Dashboard
@@ -161,7 +160,7 @@ export default function AdminPage() {
       </header>
 
       <div className="max-w-7xl mx-auto p-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <div className="bg-[#2a0808] p-6 rounded border border-[#e5d5a3]/10">
                   <p className="text-[#e5d5a3]/50 text-xs uppercase tracking-widest mb-1">Total Revenue</p>
                   <p className="text-3xl font-serif text-[#c5a059]">₹{stats.totalRevenue.toLocaleString("en-IN")}</p>
@@ -174,6 +173,11 @@ export default function AdminPage() {
                   <p className="text-[#e5d5a3]/50 text-xs uppercase tracking-widest mb-1">Active Orders</p>
                   <p className="text-3xl font-serif text-[#f4e4bc]">{stats.pendingOrders}</p>
               </div>
+          </div>
+
+          {/* 🌟 INSERTED CHART HERE 🌟 */}
+          <div className="mb-12">
+             <RevenueChart orders={orders} />
           </div>
 
           <div className="flex items-center gap-4 mb-6">
