@@ -11,13 +11,21 @@ const supabaseUrl = "https://fwyliqsazdyprlkemavu.supabase.co"
 const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3eWxpcXNhemR5cHJsa2VtYXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzOTg2MzIsImV4cCI6MjA4NTk3NDYzMn0.dXkx1pEtiZ5uwcQJgisJs14ZyUJTuz-SomMCeZv-jbE"
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-// STATIC CATEGORIES
+// STATIC CATEGORIES (For Suggestions)
 const PREDICTED_CATEGORIES = [
     { name: "Necklaces", slug: "necklaces" },
     { name: "Earrings", slug: "earrings" },
     { name: "Bangles", slug: "bangles" },
     { name: "Bridal Sets", slug: "bridal" },
     { name: "Rings", slug: "rings" }
+]
+
+// 🌟 NAVIGATION CATEGORIES
+const NAV_CATEGORIES = [
+    { name: "Necklaces", link: "/shop/necklaces" },
+    { name: "Earrings", link: "/shop/earrings" },
+    { name: "Bangles", link: "/shop/bangles" },
+    { name: "Bridal Sets", link: "/shop/bridal" }
 ]
 
 // 2. ICONS
@@ -66,7 +74,7 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist }: a
       e.preventDefault(); 
       if (!isWishlisted) {
           setIsGlittering(true);
-          setTimeout(() => setIsGlittering(false), 700); // Match CSS animation duration
+          setTimeout(() => setIsGlittering(false), 700); 
       }
       onToggleWishlist(product);
   }
@@ -88,25 +96,12 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist }: a
         </Link>
         {product.id === 1 && <span className="absolute left-3 top-3 bg-[#e5d5a3] px-3 py-1 font-sans text-[10px] font-bold uppercase text-[#1a0505] rounded-sm z-10">BESTSELLER</span>}
         
-        {/* 🌟 THE HEART EXPLOSION TRIGGER 🌟 */}
         <button onClick={handleWishlistClick} className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-[#1a0505]/60 backdrop-blur-sm hover:bg-[#e5d5a3] hover:text-[#1a0505] text-[#e5d5a3] border border-[#e5d5a3]/30 z-20 transition-colors">
             {isGlittering && (
                 <>
-                    {/* Outer Ring */}
-                    <span className="heart-particle p-1 animate-heart-burst hp-red">♥</span>
-                    <span className="heart-particle p-2 animate-heart-burst hp-gold">♥</span>
-                    <span className="heart-particle p-3 animate-heart-burst hp-red">♥</span>
-                    <span className="heart-particle p-4 animate-heart-burst hp-gold">♥</span>
-                    <span className="heart-particle p-5 animate-heart-burst hp-red">♥</span>
-                    <span className="heart-particle p-6 animate-heart-burst hp-gold">♥</span>
-                    <span className="heart-particle p-7 animate-heart-burst hp-red">♥</span>
-                    <span className="heart-particle p-8 animate-heart-burst hp-gold">♥</span>
-                    
-                    {/* Inner Ring */}
-                    <span className="heart-particle p-9 animate-heart-burst hp-gold">♥</span>
-                    <span className="heart-particle p-10 animate-heart-burst hp-red">♥</span>
-                    <span className="heart-particle p-11 animate-heart-burst hp-gold">♥</span>
-                    <span className="heart-particle p-12 animate-heart-burst hp-red">♥</span>
+                    <span className="heart-particle p-1 animate-heart-burst hp-red">♥</span><span className="heart-particle p-2 animate-heart-burst hp-gold">♥</span><span className="heart-particle p-3 animate-heart-burst hp-red">♥</span><span className="heart-particle p-4 animate-heart-burst hp-gold">♥</span>
+                    <span className="heart-particle p-5 animate-heart-burst hp-red">♥</span><span className="heart-particle p-6 animate-heart-burst hp-gold">♥</span><span className="heart-particle p-7 animate-heart-burst hp-red">♥</span><span className="heart-particle p-8 animate-heart-burst hp-gold">♥</span>
+                    <span className="heart-particle p-9 animate-heart-burst hp-gold">♥</span><span className="heart-particle p-10 animate-heart-burst hp-red">♥</span><span className="heart-particle p-11 animate-heart-burst hp-gold">♥</span><span className="heart-particle p-12 animate-heart-burst hp-red">♥</span>
                 </>
             )}
             <HeartIcon className={`h-4 w-4 relative z-10 ${isWishlisted ? "fill-red-600 text-red-600" : ""}`} filled={isWishlisted} />
@@ -118,10 +113,7 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist }: a
                 className={`w-full py-3 font-sans text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-300 ${addedEffect ? "bg-green-700 text-white" : "bg-[#e5d5a3] text-[#1a0505] hover:bg-white"}`}
             >
                 {addedEffect ? (
-                    <div className="flex items-center gap-2">
-                        <CheckIcon className="h-5 w-5 animate-check" /> 
-                        <span className="animate-pulse">Added</span>
-                    </div>
+                    <div className="flex items-center gap-2"><CheckIcon className="h-5 w-5 animate-check" /> <span className="animate-pulse">Added</span></div>
                 ) : (
                     <><ShoppingBagIcon className="h-4 w-4" /> Add to Cart</>
                 )}
@@ -173,7 +165,7 @@ export default function Page() {
     return () => elements.forEach(el => observer.unobserve(el))
   }, [products]) 
 
-  // 🌟 SEARCH LOGIC - FASTER (150ms) 🌟
+  // 🌟 SEARCH LOGIC 🌟
   useEffect(() => {
     const fetchSuggestions = async () => {
         if (searchTerm.length < 2) { setSuggestions([]); return }
@@ -193,7 +185,7 @@ export default function Page() {
     return () => clearTimeout(timeoutId)
   }, [searchTerm])
 
-  const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter' && searchTerm.trim()) { router.push(`/search?q=${encodeURIComponent(searchTerm.trim())}`); setSuggestions([]) } }
+  const handleSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter' && searchTerm.trim()) { router.push(`/shop/search?q=${encodeURIComponent(searchTerm.trim())}`); setSuggestions([]) } }
 
   useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => { if (searchRef.current && !searchRef.current.contains(event.target as Node)) { setSuggestions([]) } }
@@ -243,15 +235,33 @@ export default function Page() {
   return (
     <main className="min-h-screen bg-[#1a0505] text-[#e5d5a3] relative font-sans">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" />
-      <header className="sticky top-0 z-40 border-b border-[#e5d5a3]/10 bg-[#1a0505]/95 backdrop-blur-md transition-all duration-500">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 lg:px-8">
-          <button onClick={() => scrollTo('hero')} className="flex items-center gap-2"><span className="font-serif text-2xl font-bold tracking-[0.2em] lg:text-3xl text-gradient bg-clip-text text-transparent bg-gradient-to-r from-[#e5d5a3] via-[#fbf5e6] to-[#c5a059] text-[#e5d5a3]">LOTUS</span></button>
-          <div className="hidden flex-1 justify-center px-12 md:flex">
-            <div className="relative w-full max-w-md group" ref={searchRef}>
-              <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#e5d5a3]/40" />
-              <input type="text" placeholder="Search..." className="w-full rounded-sm border border-[#e5d5a3]/20 bg-[#2a0808] py-2 pl-10 pr-4 text-sm text-[#e5d5a3] outline-none focus:border-[#c5a059] transition-all" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={handleSearchKey} onFocus={() => { if(searchTerm.length >=2) setSuggestions(suggestions) }} />
+      
+      {/* 🌟 HEADER with Updated Search & Categories 🌟 */}
+      <header className="sticky top-0 z-40 bg-[#1a0505]/95 backdrop-blur-md transition-all duration-500 shadow-lg">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 lg:px-8 gap-8">
+          
+          {/* Logo */}
+          <button onClick={() => scrollTo('hero')} className="flex items-center gap-2">
+            <span className="font-serif text-2xl font-bold tracking-[0.2em] lg:text-3xl text-gradient bg-clip-text text-transparent bg-gradient-to-r from-[#e5d5a3] via-[#fbf5e6] to-[#c5a059] text-[#e5d5a3]">LOTUS</span>
+          </button>
+
+          {/* Search Bar */}
+          <div className="hidden flex-1 justify-center max-w-lg md:flex">
+            <div className="relative w-full group" ref={searchRef}>
+              <SearchIcon className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#c5a059]/60 group-focus-within:text-[#c5a059] transition-colors" />
+              <input 
+                type="text" 
+                placeholder="Search treasures..." 
+                className="w-full rounded-full border border-[#e5d5a3]/20 bg-[#2a0808]/50 py-2.5 pl-12 pr-4 text-sm text-[#e5d5a3] placeholder-[#e5d5a3]/30 outline-none focus:border-[#c5a059] focus:bg-[#2a0808] transition-all shadow-inner"
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+                onKeyDown={handleSearchKey} 
+                onFocus={() => { if(searchTerm.length >=2) setSuggestions(suggestions) }} 
+              />
+              
+              {/* Search Suggestions Dropdown */}
               {suggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a0505] border border-[#e5d5a3]/20 rounded shadow-2xl z-50 overflow-hidden divide-y divide-[#e5d5a3]/10">
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a0505] border border-[#e5d5a3]/20 rounded-lg shadow-2xl z-50 overflow-hidden divide-y divide-[#e5d5a3]/10">
                       {suggestions.map((item, idx) => (
                           <div key={idx}>
                               {item.type === 'category' ? (
@@ -261,24 +271,47 @@ export default function Page() {
                               ) : (
                                   <Link href={`/product/${item.id}`} className="flex items-center gap-3 p-3 hover:bg-[#2a0808] transition-colors group/item" onClick={() => { setSuggestions([]); setSearchTerm("") }}>
                                       <div className="h-10 w-10 bg-[#2a0808] rounded overflow-hidden flex-shrink-0 border border-[#e5d5a3]/10">{item.image_url && <img src={item.image_url} className="h-full w-full object-cover" />}</div>
-                                      <div className="flex-1">
-                                        <p className="text-sm text-[#e5d5a3] group-hover/item:text-white truncate">{item.name}</p>
-                                      </div>
+                                      <div className="flex-1"><p className="text-sm text-[#e5d5a3] group-hover/item:text-white truncate">{item.name}</p></div>
                                   </Link>
                               )}
                           </div>
                       ))}
-                      <div className="p-2 text-center bg-[#2a0808]/50"><button onClick={() => { router.push(`/search?q=${searchTerm}`); setSuggestions([]) }} className="text-xs text-[#e5d5a3]/60 hover:text-[#c5a059] transition-colors">See all results for "{searchTerm}"</button></div>
+                      <div className="p-2 text-center bg-[#2a0808]/50"><button onClick={() => { router.push(`/shop/search?q=${searchTerm}`); setSuggestions([]) }} className="text-xs text-[#e5d5a3]/60 hover:text-[#c5a059] transition-colors">See all results for "{searchTerm}"</button></div>
                   </div>
               )}
             </div>
           </div>
+
+          {/* Icons */}
           <nav className="flex items-center gap-5 text-[#e5d5a3]">
-            <button className="hidden md:block hover:text-white relative" onClick={() => setIsWishlistOpen(true)}><HeartIcon />{wishlist.length > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white">{wishlist.length}</span>}</button>
-            <button className="relative hover:text-white transition-colors" onClick={() => setIsCartOpen(true)}><ShoppingBagIcon />{cart.length > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#c5a059] text-[10px] font-bold text-[#1a0505]">{cart.length}</span>}</button>
+            <button className="hidden md:block hover:text-white relative group" onClick={() => setIsWishlistOpen(true)}>
+                <HeartIcon />
+                {wishlist.length > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white group-hover:scale-110 transition-transform">{wishlist.length}</span>}
+            </button>
+            <button className="relative hover:text-white transition-colors group" onClick={() => setIsCartOpen(true)}>
+                <ShoppingBagIcon />
+                {cart.length > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#c5a059] text-[10px] font-bold text-[#1a0505] group-hover:scale-110 transition-transform">{cart.length}</span>}
+            </button>
             {user ? (<Link href="/account" className="hidden md:block hover:text-white transition-colors"><div className="h-6 w-6 rounded-full bg-[#e5d5a3] text-[#1a0505] flex items-center justify-center text-xs font-bold" title={user.email}>{user.email?.charAt(0).toUpperCase()}</div></Link>) : (<button className="hidden md:block hover:text-white transition-colors" onClick={() => setIsLoginOpen(true)}><UserIcon /></button>)}
             <button className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>{mobileMenuOpen ? <XIcon /> : <MenuIcon />}</button>
           </nav>
+        </div>
+
+        {/* 🌟 NEW: AMAZON/APPLE STYLE NAVIGATION BAR (FIXED CLICK AREA) 🌟 */}
+        <div className="border-t border-[#e5d5a3]/5 bg-[#2a0808]/30 backdrop-blur-sm">
+            <div className="mx-auto max-w-7xl px-4 flex justify-center gap-4 md:gap-10 overflow-x-auto no-scrollbar">
+                {NAV_CATEGORIES.map((cat) => (
+                    <Link 
+                        key={cat.name} 
+                        href={cat.link} 
+                        className="text-xs md:text-sm uppercase tracking-[0.15em] text-[#e5d5a3]/70 hover:text-[#c5a059] hover:font-bold transition-all whitespace-nowrap relative group px-4 py-4 block"
+                    >
+                        {cat.name}
+                        {/* Little Gold Dot on Hover */}
+                        <span className="absolute bottom-2 left-1/2 w-0 h-0.5 bg-[#c5a059] group-hover:w-[calc(100%-2rem)] group-hover:left-4 transition-all duration-300"></span>
+                    </Link>
+                ))}
+            </div>
         </div>
       </header>
 

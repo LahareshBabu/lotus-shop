@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #1a0505; /* Deep Red Background */
+  --foreground: #e5d5a3; /* Gold Text */
 }
 
 @theme inline {
@@ -12,17 +12,30 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* 🌟 GOLD SCROLLBAR (Added) 🌟 */
+/* Works for Chrome, Edge, Safari */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a0505; 
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c5a059; 
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #e5d5a3; 
 }
 
 /* 🌟 IVY LEAGUE MOTION ENGINE 🌟 */
@@ -127,7 +140,6 @@ body {
 .p-8 { --tx: -20px; --ty: -20px; }  /* Top-Left */
 
 /* Inner Ring (Reduced to 14px distance - was 25px) */
-/* Added slightly different scale to make them feel "further away" or smaller */
 .p-9  { --tx: 0px; --ty: -14px; font-size: 10px !important; }
 .p-10 { --tx: 14px; --ty: 0px;  font-size: 10px !important; }
 .p-11 { --tx: 0px; --ty: 14px;  font-size: 10px !important; }
