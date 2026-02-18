@@ -11,21 +11,65 @@ const supabaseUrl = "https://fwyliqsazdyprlkemavu.supabase.co"
 const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3eWxpcXNhemR5cHJsa2VtYXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzOTg2MzIsImV4cCI6MjA4NTk3NDYzMn0.dXkx1pEtiZ5uwcQJgisJs14ZyUJTuz-SomMCeZv-jbE"
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-// STATIC CATEGORIES (For Suggestions)
+// 🌟 MEGA MENU DATA STRUCTURE (Based on Mom's List)
+const MEGA_MENU = [
+    {
+        name: "Neckwear",
+        slug: "necklaces",
+        items: [
+            { name: "Necklaces", searchQuery: "Necklace", types: "Matte • Premium • Micro Plated" },
+            { name: "Long Haram", searchQuery: "Haram", types: "Matte • Premium" },
+            { name: "Chokers", searchQuery: "Choker", types: "Matte • Premium" },
+            { name: "Attigai", searchQuery: "Attigai", types: "Micro Plated" },
+            { name: "Chains", searchQuery: "Chain", types: "With/Without Pendant" }
+        ]
+    },
+    {
+        name: "Earrings",
+        slug: "earrings",
+        items: [
+            { name: "Jhumkas & Studs", searchQuery: "Jhumka", types: "Matte • Premium" },
+            { name: "Mattal", searchQuery: "Mattal", types: "Matte • Premium • Micro Plated" },
+            { name: "Micro Plated Earrings", searchQuery: "Earring", types: "Gold Look" }
+        ]
+    },
+    {
+        name: "Bangles & Rings",
+        slug: "bangles",
+        items: [
+            { name: "Bangles", searchQuery: "Bangle", types: "Matte • Premium • Micro Plated" },
+            { name: "Finger Rings", searchQuery: "Ring", types: "Matte • Premium • Micro Plated" },
+            { name: "Bracelets", searchQuery: "Bracelet", types: "Micro Plated" },
+            { name: "Anklets", searchQuery: "Anklet", types: "Micro Plated" }
+        ]
+    },
+    {
+        name: "Bridal Collection",
+        slug: "bridal",
+        items: [
+            { name: "Full Bridal Sets", searchQuery: "Bridal", types: "Matte • Premium" },
+            { name: "Semi Bridal Sets", searchQuery: "Semi Bridal", types: "Matte • Premium" },
+            { name: "Combo Sets", searchQuery: "Combo", types: "Matte • Premium" }
+        ]
+    },
+    {
+        name: "Accessories",
+        slug: "accessories",
+        items: [
+            { name: "Hair Accessories", searchQuery: "Hair", types: "Matte • Premium" },
+            { name: "Nethi Chutti", searchQuery: "Nethi", types: "Matte • Premium • Micro Plated" },
+            { name: "Hip Chains", searchQuery: "Hip Chain", types: "Micro Plated" }
+        ]
+    }
+]
+
+// STATIC CATEGORIES (For Search Suggestions)
 const PREDICTED_CATEGORIES = [
     { name: "Necklaces", slug: "necklaces" },
     { name: "Earrings", slug: "earrings" },
     { name: "Bangles", slug: "bangles" },
     { name: "Bridal Sets", slug: "bridal" },
     { name: "Rings", slug: "rings" }
-]
-
-// 🌟 NAVIGATION CATEGORIES
-const NAV_CATEGORIES = [
-    { name: "Necklaces", link: "/shop/necklaces" },
-    { name: "Earrings", link: "/shop/earrings" },
-    { name: "Bangles", link: "/shop/bangles" },
-    { name: "Bridal Sets", link: "/shop/bridal" }
 ]
 
 // 2. ICONS
@@ -149,7 +193,10 @@ export default function Page() {
   const [suggestions, setSuggestions] = useState<any[]>([])
   const searchRef = useRef<HTMLDivElement>(null)
 
-  // 🌟 CINEMATIC SCROLL LOGIC 🌟
+  // 🌟 MEGA MENU STATE 🌟
+  const [hoveredCategory, setHoveredCategory] = useState<string | null>(null)
+
+  // CINEMATIC SCROLL LOGIC
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
@@ -165,7 +212,7 @@ export default function Page() {
     return () => elements.forEach(el => observer.unobserve(el))
   }, [products]) 
 
-  // 🌟 SEARCH LOGIC 🌟
+  // SEARCH LOGIC
   useEffect(() => {
     const fetchSuggestions = async () => {
         if (searchTerm.length < 2) { setSuggestions([]); return }
@@ -236,16 +283,14 @@ export default function Page() {
     <main className="min-h-screen bg-[#1a0505] text-[#e5d5a3] relative font-sans">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" />
       
-      {/* 🌟 HEADER with Updated Search & Categories 🌟 */}
-      <header className="sticky top-0 z-40 bg-[#1a0505]/95 backdrop-blur-md transition-all duration-500 shadow-lg">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 lg:px-8 gap-8">
+      {/* 🌟 HEADER START 🌟 */}
+      <header className="sticky top-0 z-40 bg-[#1a0505]/95 backdrop-blur-md transition-all duration-500 shadow-lg" onMouseLeave={() => setHoveredCategory(null)}>
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 lg:px-8 gap-8 relative z-50">
           
-          {/* Logo */}
           <button onClick={() => scrollTo('hero')} className="flex items-center gap-2">
             <span className="font-serif text-2xl font-bold tracking-[0.2em] lg:text-3xl text-gradient bg-clip-text text-transparent bg-gradient-to-r from-[#e5d5a3] via-[#fbf5e6] to-[#c5a059] text-[#e5d5a3]">LOTUS</span>
           </button>
 
-          {/* Search Bar */}
           <div className="hidden flex-1 justify-center max-w-lg md:flex">
             <div className="relative w-full group" ref={searchRef}>
               <SearchIcon className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#c5a059]/60 group-focus-within:text-[#c5a059] transition-colors" />
@@ -259,7 +304,6 @@ export default function Page() {
                 onFocus={() => { if(searchTerm.length >=2) setSuggestions(suggestions) }} 
               />
               
-              {/* Search Suggestions Dropdown */}
               {suggestions.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a0505] border border-[#e5d5a3]/20 rounded-lg shadow-2xl z-50 overflow-hidden divide-y divide-[#e5d5a3]/10">
                       {suggestions.map((item, idx) => (
@@ -282,7 +326,6 @@ export default function Page() {
             </div>
           </div>
 
-          {/* Icons */}
           <nav className="flex items-center gap-5 text-[#e5d5a3]">
             <button className="hidden md:block hover:text-white relative group" onClick={() => setIsWishlistOpen(true)}>
                 <HeartIcon />
@@ -297,35 +340,61 @@ export default function Page() {
           </nav>
         </div>
 
-        {/* 🌟 NEW: AMAZON/APPLE STYLE NAVIGATION BAR (FIXED CLICK AREA) 🌟 */}
-        <div className="border-t border-[#e5d5a3]/5 bg-[#2a0808]/30 backdrop-blur-sm">
-            <div className="mx-auto max-w-7xl px-4 flex justify-center gap-4 md:gap-10 overflow-x-auto no-scrollbar">
-                {NAV_CATEGORIES.map((cat) => (
-                    <Link 
-                        key={cat.name} 
-                        href={cat.link} 
-                        className="text-xs md:text-sm uppercase tracking-[0.15em] text-[#e5d5a3]/70 hover:text-[#c5a059] hover:font-bold transition-all whitespace-nowrap relative group px-4 py-4 block"
+        {/* 🌟 MEGA MENU NAVIGATION BAR 🌟 */}
+        <div className="border-t border-[#e5d5a3]/5 bg-[#2a0808]/30 backdrop-blur-sm relative">
+            <div className="mx-auto max-w-7xl px-4 flex justify-center gap-8 md:gap-16">
+                {MEGA_MENU.map((category) => (
+                    <div 
+                        key={category.name}
+                        onMouseEnter={() => setHoveredCategory(category.name)}
+                        className="py-4"
                     >
-                        {cat.name}
-                        {/* Little Gold Dot on Hover */}
-                        <span className="absolute bottom-2 left-1/2 w-0 h-0.5 bg-[#c5a059] group-hover:w-[calc(100%-2rem)] group-hover:left-4 transition-all duration-300"></span>
-                    </Link>
+                        <Link 
+                            href={`/shop/${category.slug}`}
+                            className={`text-xs md:text-sm uppercase tracking-[0.15em] hover:text-[#c5a059] hover:font-bold transition-all relative block ${hoveredCategory === category.name ? 'text-[#c5a059] font-bold' : 'text-[#e5d5a3]/70'}`}
+                        >
+                            {category.name}
+                            {/* Gold Underline Animation */}
+                            <span className={`absolute bottom-[-17px] left-1/2 -translate-x-1/2 h-0.5 bg-[#c5a059] transition-all duration-300 ease-out ${hoveredCategory === category.name ? 'w-full' : 'w-0'}`}></span>
+                        </Link>
+                    </div>
                 ))}
+            </div>
+
+            {/* 🌟 THE MEGA MENU DROPDOWN PANEL 🌟 */}
+            <div className={`absolute top-full left-0 w-full bg-[#1a0505]/95 backdrop-blur-xl border-t border-[#e5d5a3]/10 shadow-2xl transition-all duration-300 overflow-hidden ${hoveredCategory ? 'max-h-[500px] opacity-100 visible' : 'max-h-0 opacity-0 invisible'}`}>
+                <div className="mx-auto max-w-7xl px-8 py-10">
+                    {MEGA_MENU.map((category) => (
+                        <div key={category.name} className={`${hoveredCategory === category.name ? 'block' : 'hidden'} animate-fade-in`}>
+                            <h3 className="font-serif text-2xl text-[#c5a059] mb-6 tracking-wide border-b border-[#e5d5a3]/10 pb-2">{category.name} Collection</h3>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-8">
+                                {category.items.map((item, idx) => (
+                                    // 🌟 SMART LINK: Uses 'searchQuery' to guarantee results
+                                    <Link key={idx} href={`/shop/search?q=${encodeURIComponent(item.searchQuery)}`} className="group/item block p-4 rounded hover:bg-[#2a0808] transition-colors border border-transparent hover:border-[#e5d5a3]/10">
+                                        <div className="font-bold text-[#e5d5a3] group-hover/item:text-white text-base mb-1">{item.name}</div>
+                                        {/* The Finish Types */}
+                                        <div className="text-[10px] text-[#e5d5a3]/50 uppercase tracking-wider group-hover/item:text-[#c5a059] transition-colors">{item.types}</div>
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
       </header>
+      {/* 🌟 HEADER END 🌟 */}
 
-      {/* SIDEBARS & REST OF PAGE */}
+      {/* REST OF PAGE (Login, Sidebars, Hero, Featured, Footer) */}
       {isLoginOpen && (<div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"><div className="bg-[#2a0808] border border-[#e5d5a3]/30 p-8 w-full max-w-md shadow-2xl relative"><button onClick={() => setIsLoginOpen(false)} className="absolute top-4 right-4 text-[#e5d5a3]/50 hover:text-white"><XIcon /></button><h2 className="font-serif text-2xl text-[#f4e4bc] mb-2 text-center">Member Login</h2><p className="text-center text-[#e5d5a3]/50 text-xs mb-6 uppercase tracking-widest">We will send a magic link to your email</p>{!loginMessage ? (<form onSubmit={handleLogin} className="space-y-4"><input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" className="w-full bg-[#1a0505] border border-[#e5d5a3]/20 p-3 text-[#e5d5a3] outline-none focus:border-[#e5d5a3]" /><button disabled={loadingLogin} className="w-full bg-[#e5d5a3] text-[#1a0505] py-3 font-bold uppercase tracking-widest hover:bg-white disabled:opacity-50">{loadingLogin ? "Sending..." : "Send Login Link"}</button></form>) : (<div className="text-center text-green-400 p-4 border border-green-500/20 bg-green-500/10">{loginMessage}</div>)}</div></div>)}
       
       <div className={`fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${mobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setMobileMenuOpen(false)} />
       <div className={`fixed top-0 left-0 z-50 h-full w-3/4 max-w-xs bg-[#1a0505] border-r border-[#e5d5a3]/20 shadow-2xl transition-transform duration-300 transform ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col p-6`}>
           <div className="flex justify-between items-center mb-8"><span className="font-serif text-2xl text-[#e5d5a3] font-bold">LOTUS</span><button onClick={() => setMobileMenuOpen(false)} className="text-[#e5d5a3]"><XIcon /></button></div>
           <nav className="flex flex-col gap-6">
-              <Link href="/shop/necklaces" className="text-[#f4e4bc] font-serif text-lg hover:text-[#c5a059]" onClick={() => setMobileMenuOpen(false)}>Necklaces</Link>
-              <Link href="/shop/earrings" className="text-[#f4e4bc] font-serif text-lg hover:text-[#c5a059]" onClick={() => setMobileMenuOpen(false)}>Earrings</Link>
-              <Link href="/shop/bangles" className="text-[#f4e4bc] font-serif text-lg hover:text-[#c5a059]" onClick={() => setMobileMenuOpen(false)}>Bangles</Link>
-              <Link href="/shop/bridal" className="text-[#f4e4bc] font-serif text-lg hover:text-[#c5a059]" onClick={() => setMobileMenuOpen(false)}>Bridal Sets</Link>
+              {MEGA_MENU.map(cat => (
+                  <Link key={cat.name} href={`/shop/${cat.slug}`} className="text-[#f4e4bc] font-serif text-lg hover:text-[#c5a059]" onClick={() => setMobileMenuOpen(false)}>{cat.name}</Link>
+              ))}
               <div className="h-px bg-[#e5d5a3]/20 my-2"></div>
               <Link href="/about" className="text-[#e5d5a3]/70 hover:text-white" onClick={() => setMobileMenuOpen(false)}>About Us</Link>
               <Link href="/contact" className="text-[#e5d5a3]/70 hover:text-white" onClick={() => setMobileMenuOpen(false)}>Contact</Link>
@@ -374,7 +443,27 @@ export default function Page() {
         <div className="border-b border-[#e5d5a3]/10"><div className="mx-auto flex max-w-7xl flex-col items-center gap-6 px-4 py-16 text-center"><h3 className="font-serif text-3xl font-medium tracking-wide text-[#f4e4bc]">Join the Royal Family</h3><p className="max-w-md font-sans text-sm text-[#e5d5a3]/50">Subscribe to receive exclusive updates on new arrivals.</p><SubscribeForm /></div></div>
         <div className="mx-auto grid max-w-7xl grid-cols-1 gap-12 px-4 py-16 sm:grid-cols-2 lg:grid-cols-4 lg:px-8 text-left">
           <div><span className="font-serif text-xl font-bold tracking-widest text-[#e5d5a3]">LOTUS</span><p className="mt-4 font-sans text-sm leading-relaxed text-[#e5d5a3]/50">Premium imitation jewelry.</p></div>
-          <div><h4 className="mb-6 font-sans text-xs font-bold uppercase tracking-[0.2em] text-[#e5d5a3]/70">Shop</h4><ul className="flex flex-col gap-3"><li><Link href="/shop/necklaces" className="font-sans text-sm text-[#e5d5a3]/50 hover:text-[#e5d5a3] transition-colors">Necklaces</Link></li><li><Link href="/shop/earrings" className="font-sans text-sm text-[#e5d5a3]/50 hover:text-[#e5d5a3] transition-colors">Earrings</Link></li><li><Link href="/shop/bangles" className="font-sans text-sm text-[#e5d5a3]/50 hover:text-[#e5d5a3] transition-colors">Bangles</Link></li><li><Link href="/shop/bridal" className="font-sans text-sm text-[#e5d5a3]/50 hover:text-[#e5d5a3] transition-colors">Bridal Sets</Link></li></ul></div>
+          
+          {/* 🌟 DYNAMIC SHOP FOOTER LINK GENERATION 🌟 */}
+          <div>
+            <h4 className="mb-6 font-sans text-xs font-bold uppercase tracking-[0.2em] text-[#e5d5a3]/70">Shop</h4>
+            <ul className="flex flex-col gap-3">
+              {MEGA_MENU.map((category) => (
+                category.items.map((item) => (
+                  <li key={item.name}>
+                    <Link 
+                      // Uses the same smart search query for consistent results
+                      href={`/shop/search?q=${encodeURIComponent(item.searchQuery)}`} 
+                      className="font-sans text-sm text-[#e5d5a3]/50 hover:text-[#e5d5a3] transition-colors"
+                    >
+                      {item.name}
+                    </Link>
+                  </li>
+                ))
+              ))}
+            </ul>
+          </div>
+
           <div><h4 className="mb-6 font-sans text-xs font-bold uppercase tracking-[0.2em] text-[#e5d5a3]/70">Company</h4><ul className="flex flex-col gap-3"><li><Link href="/about" className="font-sans text-sm text-[#e5d5a3]/50 hover:text-[#e5d5a3] transition-colors">About Us</Link></li><li><Link href="/contact" className="font-sans text-sm text-[#e5d5a3]/50 hover:text-[#e5d5a3] transition-colors">Contact</Link></li></ul></div>
           <div><h4 className="mb-6 font-sans text-xs font-bold uppercase tracking-[0.2em] text-[#e5d5a3]/70">Support</h4><ul className="flex flex-col gap-3"><li><Link href="/shipping" className="font-sans text-sm text-[#e5d5a3]/50 hover:text-[#e5d5a3] transition-colors">Shipping & Returns</Link></li><li><Link href="/track" className="font-sans text-sm text-[#e5d5a3]/50 hover:text-[#e5d5a3] transition-colors">Track Order</Link></li></ul></div>
         </div>
