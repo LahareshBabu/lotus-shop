@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import RevenueChart from './chart/RevenueChart' // 🌟 IMPORT THE CHART
+import RevenueChart from './chart/RevenueChart' 
 
 // CONFIGURATION
 const supabaseUrl = "https://fwyliqsazdyprlkemavu.supabase.co"
@@ -16,6 +16,7 @@ const MY_ADMIN_EMAIL = "lahareshab@gmail.com"
 // ICONS
 function WarningIcon({ className="h-12 w-12" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg> }
 function CheckCircleIcon({ className="h-5 w-5" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> }
+function PlusIcon({ className="h-4 w-4" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg> }
 
 export default function AdminPage() {
   const router = useRouter()
@@ -145,6 +146,13 @@ export default function AdminPage() {
           </div>
           <div className="flex gap-4">
               
+              {/* 🌟 NEW ADD PRODUCT BUTTON 🌟 */}
+              {!isHistoryMode && (
+                  <Link href="/admin/upload" className="bg-[#c5a059] text-[#1a0505] px-6 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-white transition-all shadow-[0_0_15px_rgba(197,160,89,0.3)] flex items-center gap-2">
+                      <PlusIcon /> Add Product
+                  </Link>
+              )}
+
               {isHistoryMode && (
                   <Link href="/admin" className="text-xs uppercase tracking-widest text-[#c5a059] border border-[#c5a059] px-6 py-2 rounded hover:bg-[#c5a059] hover:text-[#1a0505] transition-all">
                       ← Back to Dashboard
@@ -154,7 +162,7 @@ export default function AdminPage() {
               <Link href="/admin/history" className="bg-[#1a0505] border border-[#c5a059] text-[#c5a059] px-6 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-[#c5a059] hover:text-[#1a0505] transition-all">View History</Link>
               
               {!isHistoryMode && (
-                  <button onClick={() => setShowEndCycleModal(true)} className="bg-red-900/20 border border-red-500/50 text-red-400 px-6 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-red-900/50 hover:border-red-500 transition-all">End Current Cycle</button>
+                  <button onClick={() => setShowEndCycleModal(true)} className="bg-red-900/20 border border-red-500/50 text-red-400 px-6 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-red-900/50 hover:border-red-500 transition-all">End Cycle</button>
               )}
           </div>
       </header>
@@ -175,7 +183,6 @@ export default function AdminPage() {
               </div>
           </div>
 
-          {/* 🌟 INSERTED CHART HERE 🌟 */}
           <div className="mb-12">
              <RevenueChart orders={orders} />
           </div>

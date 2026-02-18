@@ -20,7 +20,7 @@ function ShoppingBagIcon({ className = "h-5 w-5" }: { className?: string }) { re
 function StarRatingDisplay({ rating }: { rating: number }) { return <div className="flex text-[#c5a059]">{[1, 2, 3, 4, 5].map((star) => (<StarIcon key={star} filled={star <= Math.round(rating)} />))}</div> }
 function StarRatingInput({ rating, setRating }: { rating: number, setRating: (r: number) => void }) { const [hover, setHover] = useState(0); return <div className="flex gap-1">{[1, 2, 3, 4, 5].map((star) => { const isFilled = star <= (hover || rating); return <button key={star} type="button" className={`focus:outline-none transition-colors duration-200 ${isFilled ? 'text-[#c5a059]' : 'text-[#e5d5a3]/30'}`} onClick={() => setRating(star)} onMouseEnter={() => setHover(star)} onMouseLeave={() => setHover(rating)}><StarIcon filled={true} className="h-6 w-6" /></button> })}</div> }
 
-// 🌟 PRODUCT CARD
+// 🌟 PRODUCT CARD (Keep unchanged)
 function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist }: any) {
   const [addedEffect, setAddedEffect] = useState(false)
   const [imgLoaded, setImgLoaded] = useState(false)
@@ -40,7 +40,7 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist }: a
       <div className="relative aspect-[3/4] overflow-hidden bg-[#1a0505] flex items-center justify-center rounded-t group cursor-pointer">
         <Link href={`/product/${product.id}`} className="absolute inset-0 z-0">
             {product.image_url ? 
-                <img src={product.image_url} alt={product.name} onLoad={() => setImgLoaded(true)} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${imgLoaded ? 'image-loaded' : 'image-loading'}`} /> 
+                <img src={product.image_url} alt={product.name} onLoad={() => setImgLoaded(true)} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-110 ${imgLoaded ? 'image-loaded' : 'image-loading'}`} /> 
             : 
                 <div className="flex flex-col items-center justify-center text-[#e5d5a3]/30 h-full"><span className="font-serif text-lg tracking-widest">IMAGE</span></div>
             }
@@ -78,14 +78,16 @@ export default function ProductPage() {
   const [loading, setLoading] = useState(true)
   const [buying, setBuying] = useState(false)
   const [isWishlisted, setIsWishlisted] = useState(false)
-  const [imgLoaded, setImgLoaded] = useState(false)
   const [addedToCart, setAddedToCart] = useState(false)
   const [reviews, setReviews] = useState<any[]>([])
   const [user, setUser] = useState<any>(null)
   const [avgRating, setAvgRating] = useState(0)
   const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' })
   const [submitting, setSubmitting] = useState(false)
-  const [wishlist, setWishlist] = useState<any[]>([]) 
+  const [wishlist, setWishlist] = useState<any[]>([])
+  
+  const [activeImage, setActiveImage] = useState<string>("")
+  const [animKey, setAnimKey] = useState(0)
 
   const fetchReviews = async (productId: string) => {
       const { data } = await supabase.from('reviews').select('*').eq('product_id', productId).order('created_at', { ascending: false })
@@ -102,10 +104,8 @@ export default function ProductPage() {
       setProduct(mainProduct)
 
       if (mainProduct) {
-        // Plan A: Find items in SAME category
+        setActiveImage(mainProduct.image_url)
         let { data: relatedItems } = await supabase.from('products').select('*').eq('category', mainProduct.category).neq('id', mainProduct.id).limit(4)
-        
-        // Plan B: Fallback to ANY items
         if (!relatedItems || relatedItems.length === 0) {
              const { data: fallbackItems } = await supabase.from('products').select('*').neq('id', mainProduct.id).limit(4)
              relatedItems = fallbackItems;
@@ -113,7 +113,6 @@ export default function ProductPage() {
         } else {
              setIsFallback(false)
         }
-        
         setRelatedProducts(relatedItems || [])
         const currentWishlist = JSON.parse(localStorage.getItem('wishlist') || '[]'); setWishlist(currentWishlist)
         setIsWishlisted(currentWishlist.some((item: any) => item.id === mainProduct.id))
@@ -125,10 +124,15 @@ export default function ProductPage() {
     if (params.id) fetchData()
   }, [params.id])
 
+  const switchImage = (url: string) => {
+      if (url === activeImage) return;
+      setActiveImage(url)
+      setAnimKey(prev => prev + 1)
+  }
+
   const handleBuyNow = () => {
     if (!user) return alert("Please log in to purchase.")
     setBuying(true)
-
     const amount = product.price * 100 
     const options = {
         key: RAZORPAY_KEY_ID,
@@ -139,27 +143,17 @@ export default function ProductPage() {
         image: "https://fwyliqsazdyprlkemavu.supabase.co/storage/v1/object/public/jewelry-images/banner.jpg",
         handler: async function (response: any) { 
             const orderId = `ORD-${Date.now()}`
-            const { error } = await supabase.from('orders').insert({
-                id: orderId,
-                user_id: user.id,
-                items: [product],
-                total: product.price,
-                status: 'Processing'
-            })
-
-            if (error) { console.error(error); alert("Payment worked, but saving order failed. Contact support.") } 
-            else { alert("Order Placed Successfully! Check 'Your Orders' in Account."); router.push('/account') }
+            const { error } = await supabase.from('orders').insert({ id: orderId, user_id: user.id, items: [product], total: product.price, status: 'Processing' })
+            if (error) { console.error(error); alert("Order error.") } else { alert("Success!"); router.push('/account') }
             setBuying(false); 
         },
         theme: { color: "#c5a059" }
     };
-    
     if (!RAZORPAY_KEY_ID || RAZORPAY_KEY_ID === "rzp_test_YourKeyHere") {
         // @ts-ignore
         options.handler({}) 
         return
     }
-
     const rzp1 = new (window as any).Razorpay(options);
     rzp1.open();
   }
@@ -177,15 +171,7 @@ export default function ProductPage() {
   if (loading) return <div className="min-h-screen bg-[#1a0505] flex items-center justify-center text-[#e5d5a3] animate-pulse font-serif">Loading royal treasure...</div>
   if (!product) return <div className="min-h-screen bg-[#1a0505] flex items-center justify-center text-[#e5d5a3] font-serif">Product not found.</div>
 
-  // 🌟 THE LINK FIX: Send to recommendations + Pass the Source ID to exclude
-  const getCategorySlug = () => {
-      // Pass the current item ID (sourceId) so we can exclude it on the next page
-      const params = new URLSearchParams()
-      params.set('sourceId', product.id) 
-      params.set('fallback', isFallback.toString())
-      params.set('cat', product.category)
-      return `shop/recommendations?${params.toString()}`
-  }
+  const getCategorySlug = () => { const params = new URLSearchParams(); params.set('sourceId', product.id); params.set('fallback', isFallback.toString()); params.set('cat', product.category); return `shop/recommendations?${params.toString()}` }
 
   return (
     <div className="min-h-screen bg-[#1a0505] text-[#e5d5a3] font-sans pb-20">
@@ -196,19 +182,58 @@ export default function ProductPage() {
       </div>
 
       <div className="max-w-7xl mx-auto p-4 md:p-12 grid grid-cols-1 lg:grid-cols-2 gap-12">
-        {/* Main Product Image & Info */}
-        <div className="bg-[#2a0808] border border-[#e5d5a3]/20 p-2 relative shadow-2xl self-start sticky top-24 rounded">
-            <div className="aspect-[3/4] bg-[#1a0505] flex items-center justify-center overflow-hidden relative rounded-sm">
-                {product.image_url ? <img src={product.image_url} className={`w-full h-full object-cover rounded-sm transition-all duration-700 ${imgLoaded ? 'image-loaded' : 'image-loading'}`} onLoad={() => setImgLoaded(true)} /> : <span className="text-[#e5d5a3]/30 tracking-widest">IMAGE</span>}
+        
+        {/* 🌟 LEFT SIDE: GALLERY 🌟 */}
+        <div className="self-start sticky top-24">
+            <div className="bg-[#2a0808] border border-[#e5d5a3]/20 p-2 relative shadow-2xl rounded group overflow-hidden">
+                <div className="aspect-[3/4] bg-[#1a0505] flex items-center justify-center overflow-hidden relative rounded-sm">
+                    {/* 🌟 MAIN IMAGE (No Zoom) */}
+                    {activeImage ? 
+                        <img 
+                            key={animKey}
+                            src={activeImage} 
+                            // 🌟 ZOOM REMOVED (No group-hover:scale-110)
+                            className="w-full h-full object-cover rounded-sm animate-fade-in" 
+                        /> 
+                    : <span className="text-[#e5d5a3]/30 tracking-widest">IMAGE</span>}
+                </div>
+                <button onClick={toggleWishlist} className={`md:hidden absolute top-4 right-4 h-10 w-10 bg-[#1a0505]/80 backdrop-blur rounded-full flex items-center justify-center border transition-colors z-10 ${isWishlisted ? 'border-[#c5a059] text-red-600' : 'border-[#e5d5a3]/30 text-[#e5d5a3]'}`}><HeartIcon filled={isWishlisted} className="h-5 w-5" /></button>
             </div>
-            <button onClick={toggleWishlist} className={`md:hidden absolute top-4 right-4 h-10 w-10 bg-[#1a0505]/80 backdrop-blur rounded-full flex items-center justify-center border transition-colors z-10 ${isWishlisted ? 'border-[#c5a059] text-red-600' : 'border-[#e5d5a3]/30 text-[#e5d5a3]'}`}><HeartIcon filled={isWishlisted} className="h-5 w-5" /></button>
+
+            {/* 🌟 THUMBNAIL STRIP (Apple Style) 🌟 */}
+            {product.gallery && product.gallery.length > 1 && (
+                // 🌟 SCROLLBAR HIDDEN
+                <div className="flex gap-4 mt-6 overflow-x-auto pb-4 px-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+                    {product.gallery.map((img: string, idx: number) => (
+                        <button key={idx} className="relative group/thumb cursor-pointer pb-2" onClick={() => switchImage(img)}>
+                            {/* THUMBNAIL */}
+                            <div className={`w-20 h-20 rounded-lg border overflow-hidden transition-all duration-300 ${activeImage === img ? 'border-[#e5d5a3]/50 opacity-100' : 'border-transparent opacity-50 hover:opacity-100'}`}>
+                                <img src={img} className="w-full h-full object-cover" />
+                            </div>
+                            
+                            {/* 🌟 INTERACTIVE LINE LOGIC */}
+                            {/* 1. Active: Solid Gold Line (w-8) */}
+                            {/* 2. Hover (Inactive): Cream Line (w-8) appears */}
+                            <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 rounded-full transition-all duration-300 ease-out 
+                                ${activeImage === img 
+                                    ? 'w-8 bg-[#c5a059] opacity-100' // Selected
+                                    : 'w-0 opacity-0 group-hover/thumb:w-8 group-hover/thumb:bg-[#e5d5a3] group-hover/thumb:opacity-70' // Hover Effect
+                                }`}>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            )}
         </div>
+
+        {/* RIGHT SIDE: INFO (Unchanged) */}
         <div className="flex flex-col">
             <h1 className="text-3xl md:text-5xl font-serif text-[#f4e4bc] mb-2 leading-tight">{product.name}</h1>
             <div className="flex items-center gap-2 mb-6 text-sm"><StarRatingDisplay rating={avgRating} /><span className="text-[#e5d5a3]/50 hover:text-[#e5d5a3] cursor-pointer border-b border-[#e5d5a3]/30">{reviews.length} ratings</span></div>
             <div className="h-px w-full bg-[#e5d5a3]/10 mb-6"></div>
             <p className="text-4xl text-[#c5a059] mb-2 font-serif">₹{product.price.toLocaleString("en-IN")}</p>
             <p className="text-[#e5d5a3]/50 text-xs uppercase tracking-wider mb-8">Inclusive of all taxes</p>
+            
             <div className="space-y-3 mb-8">
                 <button onClick={handleBuyNow} disabled={buying} className="w-full bg-[#c5a059] text-[#1a0505] py-4 font-bold uppercase tracking-widest hover:bg-[#e5d5a3] transition-all shadow-lg text-sm md:text-base disabled:opacity-50 rounded">{buying ? "Processing..." : "Buy Now"}</button>
                 <div className="flex gap-3">
@@ -216,30 +241,23 @@ export default function ProductPage() {
                     <button onClick={toggleWishlist} className={`px-6 border transition-all flex items-center justify-center rounded ${isWishlisted ? 'border-[#c5a059] text-red-600 bg-[#c5a059]/10' : 'border-[#e5d5a3]/30 text-[#e5d5a3] hover:border-[#c5a059] hover:text-[#c5a059]'}`}><HeartIcon filled={isWishlisted} className="h-6 w-6" /></button>
                 </div>
             </div>
+
             <div className="grid grid-cols-3 gap-2 text-center text-[10px] text-[#e5d5a3]/60 mb-8"><div className="bg-[#2a0808] p-3 rounded flex flex-col items-center gap-2"><span className="text-xl">✨</span><span>Premium Polish</span></div><div className="bg-[#2a0808] p-3 rounded flex flex-col items-center gap-2"><span className="text-xl">🚚</span><span>Fast Delivery</span></div><div className="bg-[#2a0808] p-3 rounded flex flex-col items-center gap-2"><span className="text-xl">🔒</span><span>Secure Pay</span></div></div>
-            <div className="mb-8"><h3 className="font-bold text-[#f4e4bc] mb-4 text-lg">About this item</h3><ul className="list-disc list-outside ml-5 space-y-2 text-[#e5d5a3]/80 text-sm leading-relaxed"><li><strong>Royal Design:</strong> Inspired by the heritage jewelry of ancient Indian royalty.</li><li><strong>Material Quality:</strong> Made with a high-grade copper alloy base.</li><li><strong>Gold Plating:</strong> Advanced micro-gold plating technology (24K look).</li><li><strong>Occasion:</strong> Perfect for weddings, festivals, and special occasions.</li></ul></div>
+            
+            <div className="mb-8">
+                <h3 className="font-bold text-[#f4e4bc] mb-4 text-lg">About this item</h3>
+                <div className="text-[#e5d5a3]/80 text-sm leading-relaxed whitespace-pre-line">{product.description || "Inspired by the heritage jewelry of ancient Indian royalty. Perfect for weddings and special occasions."}</div>
+            </div>
         </div>
       </div>
 
-      {/* 🌟 RECOMMENDATION SECTION 🌟 */}
       {relatedProducts.length > 0 && (
           <section className="max-w-7xl mx-auto px-4 md:px-12 py-16 border-t border-[#e5d5a3]/10">
-              <div className="flex justify-between items-end mb-8">
-                  <h2 className="font-serif text-2xl text-[#f4e4bc] tracking-wide">You Might Also Like</h2>
-                  {/* 🌟 THE LINK TO THE RECOMMENDATIONS PAGE 🌟 */}
-                  <Link href={`/${getCategorySlug()}`} className="text-xs text-[#c5a059] border-b border-[#c5a059] pb-1 hover:text-white hover:border-white transition-all uppercase tracking-widest">
-                      View Full Collection
-                  </Link>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                  {relatedProducts.map((item) => (
-                      <ProductCard key={item.id} product={item} onAddToCart={() => handleAddToCart(item)} isWishlisted={wishlist.some(w => w.id === item.id)} onToggleWishlist={toggleWishlistRecommendation} />
-                  ))}
-              </div>
+              <div className="flex justify-between items-end mb-8"><h2 className="font-serif text-2xl text-[#f4e4bc] tracking-wide">You Might Also Like</h2><Link href={`/${getCategorySlug()}`} className="text-xs text-[#c5a059] border-b border-[#c5a059] pb-1 hover:text-white hover:border-white transition-all uppercase tracking-widest">View Full Collection</Link></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">{relatedProducts.map((item) => (<ProductCard key={item.id} product={item} onAddToCart={() => handleAddToCart(item)} isWishlisted={wishlist.some(w => w.id === item.id)} onToggleWishlist={toggleWishlistRecommendation} />))}</div>
           </section>
       )}
 
-      {/* Reviews Section */}
       <div className="max-w-7xl mx-auto px-4 md:px-12 pt-8 border-t border-[#e5d5a3]/10">
         <h2 className="font-serif text-2xl text-[#f4e4bc] mb-8">Customer Reviews</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
