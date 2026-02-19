@@ -11,7 +11,7 @@ const supabaseUrl = "https://fwyliqsazdyprlkemavu.supabase.co"
 const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3eWxpcXNhemR5cHJsa2VtYXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzOTg2MzIsImV4cCI6MjA4NTk3NDYzMn0.dXkx1pEtiZ5uwcQJgisJs14ZyUJTuz-SomMCeZv-jbE"
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-// 🌟 MEGA MENU DATA STRUCTURE (Based on Mom's List)
+// 🌟 MEGA MENU DATA STRUCTURE
 const MEGA_MENU = [
     {
         name: "Neckwear",
@@ -63,7 +63,6 @@ const MEGA_MENU = [
     }
 ]
 
-// STATIC CATEGORIES (For Search Suggestions)
 const PREDICTED_CATEGORIES = [
     { name: "Necklaces", slug: "necklaces" },
     { name: "Earrings", slug: "earrings" },
@@ -109,7 +108,7 @@ function SubscribeForm() {
   )
 }
 
-function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist }: any) {
+function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, index = 0 }: any) {
   const [addedEffect, setAddedEffect] = useState(false)
   const [imgLoaded, setImgLoaded] = useState(false)
   const [isGlittering, setIsGlittering] = useState(false)
@@ -124,15 +123,20 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist }: a
   }
 
   return (
-    <article className="group relative flex flex-col overflow-hidden bg-[#2a0808] border border-[#e5d5a3]/20 transition-all duration-300 hover:border-[#e5d5a3]/60 hover:shadow-2xl rounded">
-      <div className="relative aspect-[3/4] overflow-hidden bg-[#1a0505] flex items-center justify-center rounded-t group cursor-pointer">
+    <article 
+        // 🌟 FIX 1 & 2: Added hover:z-20 (prevent glow bleed), hover:-translate-y-2 (lift), and animate-fade-up-stagger
+        className="group relative flex flex-col overflow-hidden bg-[#2a0808] border border-[#e5d5a3]/20 rounded transition-all duration-500 ease-out hover:-translate-y-2 hover:z-20 hover:shadow-[0_15px_40px_rgba(197,160,89,0.15)] hover:border-[#c5a059]/50 animate-fade-up-stagger"
+        style={{ animationDelay: `${index * 100}ms` }}
+    >
+      <div className="relative aspect-[3/4] overflow-hidden bg-[#1a0505] flex items-center justify-center rounded-t cursor-pointer">
         <Link href={`/product/${product.id}`} className="absolute inset-0 z-0">
             {product.image_url ? 
                 <img 
                     src={product.image_url} 
                     alt={product.name} 
                     onLoad={() => setImgLoaded(true)}
-                    className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${imgLoaded ? 'image-loaded' : 'image-loading'}`} 
+                    // 🌟 FIX 4: OPTIMAL ZOOM - Changed to duration-700 ease-out group-hover:scale-105 for smooth, subtle premium zoom
+                    className={`h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 ${imgLoaded ? 'opacity-100' : 'opacity-0 blur-sm'}`} 
                 /> 
             : 
                 <div className="flex flex-col items-center justify-center text-[#e5d5a3]/30 h-full"><span className="font-serif text-lg tracking-widest">IMAGE</span></div>
@@ -154,6 +158,7 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist }: a
         <div className="absolute inset-x-0 bottom-0 z-20 translate-y-full transition-transform duration-300 group-hover:translate-y-0">
             <button 
                 onClick={(e) => { e.preventDefault(); onAddToCart(product); setAddedEffect(true); setTimeout(() => setAddedEffect(false), 2000); }} 
+                // 🌟 FIX 3: Standardized to py-3 (smaller, sleeker button)
                 className={`w-full py-3 font-sans text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-300 ${addedEffect ? "bg-green-700 text-white" : "bg-[#e5d5a3] text-[#1a0505] hover:bg-white"}`}
             >
                 {addedEffect ? (
@@ -283,6 +288,18 @@ export default function Page() {
     <main className="min-h-screen bg-[#1a0505] text-[#e5d5a3] relative font-sans">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" />
       
+      {/* 🌟 CUSTOM ANIMATION STYLES INJECTED HERE TO SUPPORT HOMEPAGE 🌟 */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes fadeUpStagger {
+          0% { opacity: 0; transform: translateY(30px) scale(0.98); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .animate-fade-up-stagger {
+          animation: fadeUpStagger 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          opacity: 0;
+        }
+      `}} />
+
       {/* 🌟 HEADER START 🌟 */}
       <header className="sticky top-0 z-40 bg-[#1a0505]/95 backdrop-blur-md transition-all duration-500 shadow-lg" onMouseLeave={() => setHoveredCategory(null)}>
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 lg:px-8 gap-8 relative z-50">
@@ -435,7 +452,14 @@ export default function Page() {
 
       <section id="featured" className="py-24 px-4 max-w-7xl mx-auto reveal-on-scroll">
         <div className="mb-20 text-center"><span className="mb-3 inline-block font-sans text-xs font-bold uppercase tracking-[0.3em] text-[#e5d5a3]/40">Curated for You</span><h2 className="font-serif text-4xl font-medium tracking-wide text-[#f4e4bc]">Featured Treasures</h2><div className="mx-auto mt-6 h-px w-24 bg-gradient-to-r from-transparent via-[#c5a059] to-transparent" /></div>
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">{products.length === 0 ? (<div className="col-span-4 py-20 text-center border border-dashed border-[#e5d5a3]/20 rounded bg-[#2a0808]/50"><p className="text-[#e5d5a3]/50 font-serif text-lg">Loading your collection...</p></div>) : (products.map((product) => (<ProductCard key={product.id} product={product} onAddToCart={addToCart} isWishlisted={wishlist.some(item => item.id === product.id)} onToggleWishlist={toggleWishlist} />)))}</div>
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            {products.length === 0 ? (
+                <div className="col-span-4 py-20 text-center border border-dashed border-[#e5d5a3]/20 rounded bg-[#2a0808]/50"><p className="text-[#e5d5a3]/50 font-serif text-lg">Loading your collection...</p></div>
+            ) : (
+                // 🌟 FIX 1 & 2 Application: Passed index to ProductCard for staggered animation
+                products.map((product, index) => (<ProductCard key={product.id} index={index} product={product} onAddToCart={addToCart} isWishlisted={wishlist.some(item => item.id === product.id)} onToggleWishlist={toggleWishlist} />))
+            )}
+        </div>
         <div className="mt-20 text-center"><button onClick={() => scrollTo('featured')} className="text-[#e5d5a3] border-b border-[#e5d5a3]/30 pb-1 hover:text-white hover:border-[#e5d5a3] transition-all text-sm uppercase tracking-widest">View All Products</button></div>
       </section>
 
@@ -444,7 +468,6 @@ export default function Page() {
         <div className="mx-auto grid max-w-7xl grid-cols-1 gap-12 px-4 py-16 sm:grid-cols-2 lg:grid-cols-4 lg:px-8 text-left">
           <div><span className="font-serif text-xl font-bold tracking-widest text-[#e5d5a3]">LOTUS</span><p className="mt-4 font-sans text-sm leading-relaxed text-[#e5d5a3]/50">Premium imitation jewelry.</p></div>
           
-          {/* 🌟 DYNAMIC SHOP FOOTER LINK GENERATION 🌟 */}
           <div>
             <h4 className="mb-6 font-sans text-xs font-bold uppercase tracking-[0.2em] text-[#e5d5a3]/70">Shop</h4>
             <ul className="flex flex-col gap-3">
@@ -452,7 +475,6 @@ export default function Page() {
                 category.items.map((item) => (
                   <li key={item.name}>
                     <Link 
-                      // Uses the same smart search query for consistent results
                       href={`/shop/search?q=${encodeURIComponent(item.searchQuery)}`} 
                       className="font-sans text-sm text-[#e5d5a3]/50 hover:text-[#e5d5a3] transition-colors"
                     >
