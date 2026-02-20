@@ -1,5 +1,5 @@
 # Stage 1: The Base Environment (Using lightweight Alpine Linux)
-FROM node:18-alpine AS base
+FROM node:20-alpine AS base
 
 # Stage 2: The Builder (Where we assemble the code)
 FROM base AS builder
