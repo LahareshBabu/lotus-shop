@@ -5,9 +5,12 @@ import { NextResponse } from 'next/server'
 // Force dynamic execution so it runs every time you reload
 export const dynamic = 'force-dynamic'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY!
+// 🌟 FIX: Hardcoded Supabase keys so the Docker build doesn't crash
+const supabaseUrl = "https://fwyliqsazdyprlkemavu.supabase.co"
+const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3eWxpcXNhemR5cHJsa2VtYXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzOTg2MzIsImV4cCI6MjA4NTk3NDYzMn0.dXkx1pEtiZ5uwcQJgisJs14ZyUJTuz-SomMCeZv-jbE"
+
+// 🌟 FIX: Added a fallback string for Gemini so the Robot doesn't crash here either
+const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "dummy_build_key"
 
 const supabase = createClient(supabaseUrl, supabaseKey)
 const genAI = new GoogleGenerativeAI(apiKey)
