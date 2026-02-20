@@ -246,7 +246,18 @@ export default function Page() {
 
   useEffect(() => {
     async function init() {
-        const { data } = await supabase.from('products').select('*'); if (data) setProducts(data)
+        // 🌟 IVY LEAGUE CACHING ARCHITECTURE: Fetching from our custom API instead of direct DB
+        try {
+            const res = await fetch('/api/products');
+            const json = await res.json();
+            if (json.products) setProducts(json.products);
+            
+            // Console log so you can proudly watch it hit the cache!
+            console.log("Data Source:", json.source); 
+        } catch (error) {
+            console.error("Failed to fetch products", error);
+        }
+
         const { data: { session } } = await supabase.auth.getSession(); if (session) setUser(session.user)
         
         const rawCart = JSON.parse(localStorage.getItem('cart') || '[]')
