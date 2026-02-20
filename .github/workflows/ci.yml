@@ -1,0 +1,32 @@
+name: LOTUS CI/CD Assembly Line
+
+# 1. WHEN SHOULD THE ROBOT WAKE UP?
+# Every time you push code to the 'main' or 'master' branch.
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+# 2. WHAT SHOULD THE ROBOT DO?
+jobs:
+  build-and-inspect:
+    name: Inspector Robot (Build Test)
+    runs-on: ubuntu-latest # The robot borrows a free Linux computer from GitHub
+
+    steps:
+    - name: 📦 Grab the Code
+      uses: actions/checkout@v4
+
+    - name: 🛠️ Set up Node.js Engine
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: 📥 Install All Required Packages
+      run: npm ci
+
+    - name: 🏗️ Attempt to Build the Website
+      # If this step fails, the robot flashes a red light and stops.
+      run: npm run build
