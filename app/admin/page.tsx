@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -21,7 +21,8 @@ function WarningIcon({ className="h-12 w-12" }) { return <svg className={classNa
 function CheckCircleIcon({ className="h-5 w-5" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> }
 function PlusIcon({ className="h-4 w-4" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg> }
 
-export default function AdminPage() {
+// 🌟 FIX: Renamed from AdminPage to AdminContent
+function AdminContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const historyCycleId = searchParams.get('cycle')
@@ -239,5 +240,14 @@ export default function AdminPage() {
           </div>
       </div>
     </div>
+  )
+}
+
+// 🌟 FIX: The new Suspense boundary that makes the Robot happy!
+export default function AdminPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#1a0505] flex items-center justify-center text-[#c5a059]">Loading...</div>}>
+      <AdminContent />
+    </Suspense>
   )
 }
