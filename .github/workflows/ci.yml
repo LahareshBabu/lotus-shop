@@ -27,6 +27,10 @@ jobs:
     - name: 📥 Install All Required Packages
       run: npm ci
 
+    # 🌟 NEW: The Robot will now run your Jest math tests automatically!
+    - name: 🧪 Run Automated Tests
+      run: npm test
+
     - name: 🏗️ Attempt to Build the Website
       # If this step fails, the robot flashes a red light and stops.
       run: npm run build
