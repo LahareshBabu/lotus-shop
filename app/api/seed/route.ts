@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-import { GoogleGenerativeAI } from "@google/generative-ai"
 import { NextResponse } from 'next/server'
 
 // Force dynamic execution so it runs every time you reload
@@ -9,14 +8,10 @@ export const dynamic = 'force-dynamic'
 const supabaseUrl = "https://fwyliqsazdyprlkemavu.supabase.co"
 const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3eWxpcXNhemR5cHJsa2VtYXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzOTg2MzIsImV4cCI6MjA4NTk3NDYzMn0.dXkx1pEtiZ5uwcQJgisJs14ZyUJTuz-SomMCeZv-jbE"
 
-// 🌟 FIX: Added a fallback string for Gemini so the Robot doesn't crash here either
-const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "dummy_build_key"
-
 const supabase = createClient(supabaseUrl, supabaseKey)
-const genAI = new GoogleGenerativeAI(apiKey)
 
 export async function GET() {
-  console.log("--- STARTING SERVER-SIDE TRAINING ---")
+  console.log("--- STARTING DATABASE HEALTH CHECK ---")
   
   try {
     // 1. Get Products
@@ -32,42 +27,14 @@ export async function GET() {
         return NextResponse.json({ message: "No products found." })
     }
 
-    console.log(`✅ Found ${products.length} products. Processing...`)
+    console.log(`✅ Found ${products.length} products. Pure database search is ready.`)
 
-    // 2. Initialize Gemini
-    const model = genAI.getGenerativeModel({ model: "models/gemini-embedding-001" })
-
-    // 3. Loop and Embed
-    let successCount = 0
-    
-    for (const product of products) {
-        console.log(`🔹 Processing: ${product.name} (ID: ${product.id})`)
-        
-        const content = `Product: ${product.name}. Category: ${product.category}. Price: ${product.price}. Description: ${product.name} is a high-quality ${product.category}.`
-        
-        // Generate Vector
-        const embeddingResult = await model.embedContent(content)
-        const embedding = embeddingResult.embedding.values
-
-        // SAVE TO DB (The moment of truth)
-        const { error: insertError } = await supabase.from('product_embeddings').upsert({
-            id: product.id,
-            content: content,
-            embedding: embedding
-        })
-
-        if (insertError) {
-            console.error(`❌ FAILED to save ${product.name}:`, insertError)
-        } else {
-            console.log(`✅ SAVED ${product.name} successfully.`)
-            successCount++
-        }
-    }
+    // AI embedding loop has been permanently removed for 100% system independence.
 
     return NextResponse.json({ 
-        message: "Training Complete", 
-        successCount: successCount, 
-        total: products.length 
+        message: "Database Health Check Complete. AI dependencies removed.", 
+        productCount: products.length,
+        status: "100% Independent"
     })
 
   } catch (error: any) {

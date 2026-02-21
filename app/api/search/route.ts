@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-import { GoogleGenerativeAI } from "@google/generative-ai"
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
@@ -8,11 +7,7 @@ export const dynamic = 'force-dynamic'
 const supabaseUrl = "https://fwyliqsazdyprlkemavu.supabase.co"
 const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3eWxpcXNhemR5cHJsa2VtYXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzOTg2MzIsImV4cCI6MjA4NTk3NDYzMn0.dXkx1pEtiZ5uwcQJgisJs14ZyUJTuz-SomMCeZv-jbE"
 
-// 🌟 FIX: Added a fallback string for Gemini so the Robot doesn't crash on this next!
-const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "dummy_build_key"
-
 const supabase = createClient(supabaseUrl, supabaseKey)
-const genAI = new GoogleGenerativeAI(apiKey)
 
 export async function GET(req: Request) {
   try {
@@ -22,69 +17,17 @@ export async function GET(req: Request) {
     if (!query || query.trim().length < 2) return NextResponse.json([])
 
     // ─────────────────────────────────────────────────────────────
-    // STEP 1: DIRECT TEXT SEARCH (Fastest & Most Accurate)
+    // STEP 1: DIRECT TEXT SEARCH (Fastest & 100% in your control)
     // ─────────────────────────────────────────────────────────────
-    // If user types "Bang", "Gold", "Neck", we trust they know what they want.
+    // If user types "Bangles", "Gold", "Necklace", it pulls directly from DB.
     const { data: directMatches } = await supabase
         .from('products')
         .select('*')
         .or(`name.ilike.%${query}%,category.ilike.%${query}%`)
         .limit(8)
 
-    // If we find exact keyword matches (e.g. "Bangles"), return IMMEDIATELY.
-    // This solves the "Bang -> Necklace" issue.
-    if (directMatches && directMatches.length > 0) {
-        return NextResponse.json(directMatches)
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // STEP 2: QUERY EXPANSION (The "Translator")
-    // ─────────────────────────────────────────────────────────────
-    // If text search failed (e.g. "Wrist", "Thriat", "Leg"), we ask the AI to translate.
-    
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" })
-    
-    const prompt = `
-    You are a search query translator for a Jewelry Store called "Lotus".
-    User Input: "${query}"
-    
-    Task: Convert the input into a single specific jewelry category that exists in our store.
-    
-    Our Store Categories: [Necklace, Earrings, Bangles, Bridal Set, Rings]
-    
-    Rules:
-    1. If input is "wrist" or "hand", output "Bangles".
-    2. If input is "neck", output "Necklace".
-    3. If input is "ear", output "Earrings".
-    4. If input is irrelevant (e.g., "leg", "shoe", "thriat", "food"), output "NULL".
-    5. Output ONLY the category name. No sentences.
-    `
-
-    try {
-        const result = await model.generateContent(prompt)
-        const translatedCategory = result.response.text().trim()
-
-        // If AI says NULL (irrelevant), return empty. (Fixes "Thriat", "Leg")
-        if (translatedCategory === "NULL" || translatedCategory.includes("NULL")) {
-            return NextResponse.json([])
-        }
-
-        // ─────────────────────────────────────────────────────────────
-        // STEP 3: SEARCH WITH TRANSLATED TERM
-        // ─────────────────────────────────────────────────────────────
-        // Search for the *translated* category (e.g., "Bangles")
-        const { data: expandedMatches } = await supabase
-            .from('products')
-            .select('*')
-            .ilike('category', `%${translatedCategory}%`)
-            .limit(8)
-
-        return NextResponse.json(expandedMatches || [])
-
-    } catch (aiError) {
-        console.error("AI Expansion Failed:", aiError)
-        return NextResponse.json([])
-    }
+    // Return the database matches, or an empty array if nothing is found.
+    return NextResponse.json(directMatches || [])
 
   } catch (error: any) {
     console.error("Search Error:", error)
