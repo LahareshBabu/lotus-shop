@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
@@ -16,11 +16,13 @@ function HeartIcon({ filled, className }: { filled: boolean, className?: string 
 function StarIcon({ filled, className = "h-4 w-4" }: { filled: boolean, className?: string }) { return <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg> }
 function CheckIcon({ className = "h-5 w-5" }: { className?: string }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg> }
 function ShoppingBagIcon({ className = "h-5 w-5" }: { className?: string }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" /></svg> }
+function ChevronLeftIcon({ className = "h-6 w-6" }: { className?: string }) { return <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={className}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg> }
+function ChevronRightIcon({ className = "h-6 w-6" }: { className?: string }) { return <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={className}><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg> }
 
 function StarRatingDisplay({ rating }: { rating: number }) { return <div className="flex text-[#c5a059]">{[1, 2, 3, 4, 5].map((star) => (<StarIcon key={star} filled={star <= Math.round(rating)} />))}</div> }
 function StarRatingInput({ rating, setRating }: { rating: number, setRating: (r: number) => void }) { const [hover, setHover] = useState(0); return <div className="flex gap-1">{[1, 2, 3, 4, 5].map((star) => { const isFilled = star <= (hover || rating); return <button key={star} type="button" className={`focus:outline-none transition-colors duration-200 ${isFilled ? 'text-[#c5a059]' : 'text-[#e5d5a3]/30'}`} onClick={() => setRating(star)} onMouseEnter={() => setHover(star)} onMouseLeave={() => setHover(rating)}><StarIcon filled={true} className="h-6 w-6" /></button> })}</div> }
 
-// 🌟 PRODUCT CARD (Keep unchanged)
+// 🌟 PRODUCT CARD 
 function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist }: any) {
   const [addedEffect, setAddedEffect] = useState(false)
   const [imgLoaded, setImgLoaded] = useState(false)
@@ -36,7 +38,8 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist }: a
   }
 
   return (
-    <article className="group relative flex flex-col overflow-hidden bg-[#2a0808] border border-[#e5d5a3]/20 transition-all duration-300 hover:border-[#e5d5a3]/60 hover:shadow-2xl rounded">
+    // LEAD ENGINEER CSS MATH: Exactly 1 card on mobile, 2 on tablet, and exactly 4 on Desktop. Snap to start!
+    <article className="shrink-0 w-full sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-4.5rem)/4)] snap-start group relative flex flex-col overflow-hidden bg-[#2a0808] border border-[#e5d5a3]/20 transition-all duration-300 hover:border-[#e5d5a3]/60 hover:shadow-2xl rounded">
       <div className="relative aspect-[3/4] overflow-hidden bg-[#1a0505] flex items-center justify-center rounded-t group cursor-pointer">
         <Link href={`/product/${product.id}`} className="absolute inset-0 z-0">
             {product.image_url ? 
@@ -62,7 +65,7 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist }: a
         </div>
       </div>
       <div className="flex flex-1 flex-col gap-2 p-4 bg-[#2a0808]">
-        <Link href={`/product/${product.id}`} className="hover:text-white transition-colors"><h3 className="font-serif text-lg font-medium tracking-wide text-[#e5d5a3]">{product.name}</h3></Link>
+        <Link href={`/product/${product.id}`} className="hover:text-white transition-colors"><h3 className="font-serif text-lg font-medium tracking-wide text-[#e5d5a3] line-clamp-1">{product.name}</h3></Link>
         <p className="font-sans text-base font-bold text-white/80">₹{product.price.toLocaleString("en-IN")}</p>
       </div>
     </article>
@@ -89,6 +92,28 @@ export default function ProductPage() {
   const [activeImage, setActiveImage] = useState<string>("")
   const [animKey, setAnimKey] = useState(0)
 
+  // 🚀 CAROUSEL LOGIC 🚀
+  const carouselRef = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(true)
+
+  const handleScroll = () => {
+      if (carouselRef.current) {
+          const { scrollLeft, scrollWidth, clientWidth } = carouselRef.current;
+          setCanScrollLeft(scrollLeft > 10);
+          setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 10);
+      }
+  };
+
+  const scrollCarousel = (direction: 'left' | 'right') => {
+      if (carouselRef.current) {
+          // Because items are perfectly sized to 4 per viewport, sweeping 1 full clientWidth naturally grabs the next 4 items!
+          const visibleWidth = carouselRef.current.clientWidth;
+          const scrollAmount = direction === 'left' ? -visibleWidth : visibleWidth; 
+          carouselRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+      }
+  };
+
   const fetchReviews = async (productId: string) => {
       const { data } = await supabase.from('reviews').select('*').eq('product_id', productId).order('created_at', { ascending: false })
       if (data) {
@@ -105,15 +130,49 @@ export default function ProductPage() {
 
       if (mainProduct) {
         setActiveImage(mainProduct.image_url)
-        let { data: relatedItems } = await supabase.from('products').select('*').eq('category', mainProduct.category).neq('id', mainProduct.id).limit(4)
-        if (!relatedItems || relatedItems.length === 0) {
-             const { data: fallbackItems } = await supabase.from('products').select('*').neq('id', mainProduct.id).limit(4)
-             relatedItems = fallbackItems;
-             setIsFallback(true) 
-        } else {
-             setIsFallback(false)
+        
+        let finalRelatedItems: any[] = [];
+        try {
+            const aiResponse = await fetch(`http://127.0.0.1:8000/api/recommend/${mainProduct.id}`);
+            if (aiResponse.ok) {
+                const aiData = await aiResponse.json();
+                const recommendedIds = aiData.recommendations.map((rec: any) => rec.id);
+                if (recommendedIds.length > 0) {
+                    const { data: aiProducts } = await supabase
+                        .from('products')
+                        .select('*')
+                        .in('id', recommendedIds);
+                        
+                    if (aiProducts) {
+                        finalRelatedItems = recommendedIds.map((id: number) => 
+                            aiProducts.find(product => product.id === id)
+                        ).filter(Boolean); 
+                    } else {
+                        finalRelatedItems = [];
+                    }
+                }
+            }
+        } catch (error) {
+            console.log("Genius AI Server is offline. Using fallback.");
         }
-        setRelatedProducts(relatedItems || [])
+
+        if (finalRelatedItems.length === 0) {
+            setIsFallback(true) 
+            const { data: fallbackItems } = await supabase.from('products').select('*').eq('category', mainProduct.category).neq('id', mainProduct.id).limit(10);
+            if (!fallbackItems || fallbackItems.length === 0) {
+                 const { data: ultimateFallback } = await supabase.from('products').select('*').neq('id', mainProduct.id).limit(10);
+                 finalRelatedItems = ultimateFallback || [];
+            } else {
+                 finalRelatedItems = fallbackItems;
+            }
+        } else {
+            setIsFallback(false)
+        }
+        
+        setRelatedProducts(finalRelatedItems)
+        // Set initial scroll state after items load
+        setTimeout(handleScroll, 100);
+
         const currentWishlist = JSON.parse(localStorage.getItem('wishlist') || '[]'); setWishlist(currentWishlist)
         setIsWishlisted(currentWishlist.some((item: any) => item.id === mainProduct.id))
         await fetchReviews(mainProduct.id)
@@ -174,7 +233,7 @@ export default function ProductPage() {
   const getCategorySlug = () => { const params = new URLSearchParams(); params.set('sourceId', product.id); params.set('fallback', isFallback.toString()); params.set('cat', product.category); return `shop/recommendations?${params.toString()}` }
 
   return (
-    <div className="min-h-screen bg-[#1a0505] text-[#e5d5a3] font-sans pb-20">
+    <div className="min-h-screen bg-[#1a0505] text-[#e5d5a3] font-sans pb-20 overflow-x-hidden">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" />
       <div className="p-6 border-b border-[#e5d5a3]/10 flex justify-between items-center sticky top-0 bg-[#1a0505]/95 backdrop-blur z-50">
          <Link href="/" className="font-serif text-2xl font-bold tracking-widest text-[#e5d5a3]">LOTUS</Link>
@@ -192,7 +251,6 @@ export default function ProductPage() {
                         <img 
                             key={animKey}
                             src={activeImage} 
-                            // 🌟 ZOOM REMOVED (No group-hover:scale-110)
                             className="w-full h-full object-cover rounded-sm animate-fade-in" 
                         /> 
                     : <span className="text-[#e5d5a3]/30 tracking-widest">IMAGE</span>}
@@ -202,7 +260,6 @@ export default function ProductPage() {
 
             {/* 🌟 THUMBNAIL STRIP (Apple Style) 🌟 */}
             {product.gallery && product.gallery.length > 1 && (
-                // 🌟 SCROLLBAR HIDDEN
                 <div className="flex gap-4 mt-6 overflow-x-auto pb-4 px-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
                     {product.gallery.map((img: string, idx: number) => (
                         <button key={idx} className="relative group/thumb cursor-pointer pb-2" onClick={() => switchImage(img)}>
@@ -212,12 +269,10 @@ export default function ProductPage() {
                             </div>
                             
                             {/* 🌟 INTERACTIVE LINE LOGIC */}
-                            {/* 1. Active: Solid Gold Line (w-8) */}
-                            {/* 2. Hover (Inactive): Cream Line (w-8) appears */}
                             <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 rounded-full transition-all duration-300 ease-out 
                                 ${activeImage === img 
-                                    ? 'w-8 bg-[#c5a059] opacity-100' // Selected
-                                    : 'w-0 opacity-0 group-hover/thumb:w-8 group-hover/thumb:bg-[#e5d5a3] group-hover/thumb:opacity-70' // Hover Effect
+                                    ? 'w-8 bg-[#c5a059] opacity-100' 
+                                    : 'w-0 opacity-0 group-hover/thumb:w-8 group-hover/thumb:bg-[#e5d5a3] group-hover/thumb:opacity-70' 
                                 }`}>
                             </div>
                         </button>
@@ -226,7 +281,7 @@ export default function ProductPage() {
             )}
         </div>
 
-        {/* RIGHT SIDE: INFO (Unchanged) */}
+        {/* RIGHT SIDE: INFO */}
         <div className="flex flex-col">
             <h1 className="text-3xl md:text-5xl font-serif text-[#f4e4bc] mb-2 leading-tight">{product.name}</h1>
             <div className="flex items-center gap-2 mb-6 text-sm"><StarRatingDisplay rating={avgRating} /><span className="text-[#e5d5a3]/50 hover:text-[#e5d5a3] cursor-pointer border-b border-[#e5d5a3]/30">{reviews.length} ratings</span></div>
@@ -251,10 +306,57 @@ export default function ProductPage() {
         </div>
       </div>
 
+      {/* 🚀 THE ROYAL CAROUSEL 🚀 */}
       {relatedProducts.length > 0 && (
-          <section className="max-w-7xl mx-auto px-4 md:px-12 py-16 border-t border-[#e5d5a3]/10">
-              <div className="flex justify-between items-end mb-8"><h2 className="font-serif text-2xl text-[#f4e4bc] tracking-wide">You Might Also Like</h2><Link href={`/${getCategorySlug()}`} className="text-xs text-[#c5a059] border-b border-[#c5a059] pb-1 hover:text-white hover:border-white transition-all uppercase tracking-widest">View Full Collection</Link></div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">{relatedProducts.map((item) => (<ProductCard key={item.id} product={item} onAddToCart={() => handleAddToCart(item)} isWishlisted={wishlist.some(w => w.id === item.id)} onToggleWishlist={toggleWishlistRecommendation} />))}</div>
+          <section className="w-full py-16 border-t border-[#e5d5a3]/10 relative">
+              {/* Header aligns exactly with the gallery above */}
+              <div className="max-w-7xl mx-auto px-4 md:px-12 mb-8 flex justify-between items-end">
+                  <h2 className="font-serif text-2xl text-[#f4e4bc] tracking-wide">You Might Also Like</h2>
+                  <Link href={`/${getCategorySlug()}`} className="text-xs text-[#c5a059] border-b border-[#c5a059] pb-1 hover:text-white hover:border-white transition-all uppercase tracking-widest hidden md:block">View Full Collection</Link>
+              </div>
+
+              {/* LEAD ENGINEER FIX: Increased horizontal padding to px-20 to create a wider gutter for the buttons */}
+              <div className="relative max-w-7xl mx-auto px-4 md:px-20 group/carousel">
+                  
+                  {/* Left Button: Moved from left-0 to left-4 to float centrally in the new, wider gutter */}
+                  <button 
+                      onClick={() => scrollCarousel('left')}
+                      disabled={!canScrollLeft}
+                      className={`hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-30 h-12 w-12 items-center justify-center rounded-full bg-[#1a0505]/90 backdrop-blur border border-[#c5a059]/30 text-[#e5d5a3] shadow-xl transition-all duration-300 disabled:opacity-0 disabled:pointer-events-none hover:bg-[#c5a059] hover:text-[#1a0505]`}
+                  >
+                      <ChevronLeftIcon />
+                  </button>
+
+                  {/* The Scrolling Track */}
+                  <div 
+                      ref={carouselRef}
+                      onScroll={handleScroll}
+                      className="flex gap-6 overflow-x-auto pb-8 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] scroll-smooth"
+                  >
+                      {relatedProducts.map((item) => (
+                          <ProductCard 
+                              key={item.id} 
+                              product={item} 
+                              onAddToCart={() => handleAddToCart(item)} 
+                              isWishlisted={wishlist.some(w => w.id === item.id)} 
+                              onToggleWishlist={toggleWishlistRecommendation} 
+                          />
+                      ))}
+                  </div>
+
+                  {/* Right Button: Moved from right-0 to right-4 to float centrally in the new, wider gutter */}
+                  <button 
+                      onClick={() => scrollCarousel('right')}
+                      disabled={!canScrollRight}
+                      className={`hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-30 h-12 w-12 items-center justify-center rounded-full bg-[#1a0505]/90 backdrop-blur border border-[#c5a059]/30 text-[#e5d5a3] shadow-xl transition-all duration-300 disabled:opacity-0 disabled:pointer-events-none hover:bg-[#c5a059] hover:text-[#1a0505]`}
+                  >
+                      <ChevronRightIcon />
+                  </button>
+              </div>
+              
+              <div className="max-w-7xl mx-auto px-4 mt-4 md:hidden text-center">
+                  <Link href={`/${getCategorySlug()}`} className="text-xs text-[#c5a059] border-b border-[#c5a059] pb-1 hover:text-white hover:border-white transition-all uppercase tracking-widest">View Full Collection</Link>
+              </div>
           </section>
       )}
 

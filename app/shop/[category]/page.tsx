@@ -11,11 +11,11 @@ const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 const PREDICTED_CATEGORIES = [
-    { name: "Necklaces", slug: "necklaces" },
-    { name: "Earrings", slug: "earrings" },
-    { name: "Bangles", slug: "bangles" },
-    { name: "Bridal Sets", slug: "bridal" },
-    { name: "Rings", slug: "rings" }
+  { name: "Necklaces", slug: "necklaces" },
+  { name: "Earrings", slug: "earrings" },
+  { name: "Bangles", slug: "bangles" },
+  { name: "Bridal Sets", slug: "bridal" },
+  { name: "Rings", slug: "rings" }
 ]
 
 // ICONS
@@ -162,25 +162,57 @@ export default function CategoryPage() {
         const { data: { session } } = await supabase.auth.getSession()
         if (session) setUser(session.user)
 
-        let query = supabase.from('products').select('*')
+        // 🚀 THE AI BRIDGE FOR CATEGORY PAGES 🚀
+        if (category === 'recommendations' && sourceId) {
+            let finalRelatedItems: any[] = [];
+            try {
+                const aiResponse = await fetch(`http://127.0.0.1:8000/api/recommend/${sourceId}`);
+                if (aiResponse.ok) {
+                    const aiData = await aiResponse.json();
+                    const recommendedIds = aiData.recommendations.map((rec: any) => rec.id);
+                    if (recommendedIds.length > 0) {
+                        const { data: aiProducts } = await supabase
+                            .from('products')
+                            .select('*')
+                            .in('id', recommendedIds);
+                            
+                        if (aiProducts) {
+                            finalRelatedItems = recommendedIds.map((id: number) => 
+                                aiProducts.find(product => product.id === id)
+                            ).filter(Boolean); 
+                        }
+                    }
+                }
+            } catch (error) {
+                console.log("Genius AI Server is offline. Using fallback.");
+            }
 
-        if (category === 'search' && searchQuery) {
-            query = query.or(`name.ilike.%${searchQuery}%,category.ilike.%${searchQuery}%`)
+            // Fallback if AI fails or returns empty
+            if (finalRelatedItems.length === 0) {
+                let query = supabase.from('products').select('*');
+                if (!isFallback && originalCat) query = query.eq('category', originalCat);
+                query = query.neq('id', sourceId);
+                const { data } = await query;
+                finalRelatedItems = data || [];
+            }
+            
+            setProducts(finalRelatedItems);
+        } else {
+            // STANDARD CATEGORY / SEARCH BEHAVIOR
+            let query = supabase.from('products').select('*')
+
+            if (category === 'search' && searchQuery) {
+                query = query.or(`name.ilike.%${searchQuery}%,category.ilike.%${searchQuery}%`)
+            }
+            else if (category && category.toLowerCase() !== 'all' && category.toLowerCase() !== 'search') {
+                 let queryTerm = category
+                 if (category.toLowerCase().endsWith('s')) { queryTerm = category.slice(0, -1) }
+                 query = query.ilike('category', `%${queryTerm}%`)
+            }
+            
+            const { data } = await query
+            setProducts(data || [])
         }
-        else if (category === 'recommendations') {
-             if (!isFallback && originalCat) query = query.eq('category', originalCat)
-             if (sourceId) query = query.neq('id', sourceId)
-        }
-        else if (category && category.toLowerCase() !== 'all' && category.toLowerCase() !== 'search') {
-             let queryTerm = category
-             if (category.toLowerCase().endsWith('s')) { queryTerm = category.slice(0, -1) }
-             query = query.ilike('category', `%${queryTerm}%`)
-        }
-        
-        const { data } = await query
-        const fetchedProducts = data || []
-        
-        setProducts(fetchedProducts)
         
         const rawCart = JSON.parse(localStorage.getItem('cart') || '[]')
         setCart(rawCart)
@@ -188,7 +220,7 @@ export default function CategoryPage() {
         setWishlist(storedWishlist)
     }
     init()
-  }, [category, searchQuery, sourceId])
+  }, [category, searchQuery, sourceId, originalCat, isFallback])
 
   // 2. Filter Engine
   useEffect(() => {
@@ -204,10 +236,13 @@ export default function CategoryPage() {
       if (sortOrder === 'price-asc') result.sort((a, b) => a.price - b.price);
       else if (sortOrder === 'price-desc') result.sort((a, b) => b.price - a.price);
       else if (sortOrder === 'newest') {
-          result.sort((a, b) => {
-              if (b.created_at && a.created_at) return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-              return b.id - a.id 
-          }); 
+          // If we are strictly in 'recommendations' mode, do NOT resort by newest. Keep the mathematical AI order!
+          if (category !== 'recommendations') {
+              result.sort((a, b) => {
+                  if (b.created_at && a.created_at) return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                  return b.id - a.id 
+              }); 
+          }
       }
 
       setTimeout(() => {
@@ -215,7 +250,7 @@ export default function CategoryPage() {
           setIsFiltering(false)
       }, 50)
 
-  }, [products, sortOrder, priceRange]);
+  }, [products, sortOrder, priceRange, category]);
 
 
   useEffect(() => {
