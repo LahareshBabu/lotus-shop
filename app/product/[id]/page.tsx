@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation' // 🚀 IMPORTED useSearchParams
 import Script from 'next/script'
 
 // CONFIGURATION
@@ -23,13 +23,11 @@ function StarRatingDisplay({ rating }: { rating: number }) { return <div classNa
 function StarRatingInput({ rating, setRating }: { rating: number, setRating: (r: number) => void }) { const [hover, setHover] = useState(0); return <div className="flex gap-1">{[1, 2, 3, 4, 5].map((star) => { const isFilled = star <= (hover || rating); return <button key={star} type="button" className={`focus:outline-none transition-colors duration-200 ${isFilled ? 'text-[#c5a059]' : 'text-[#e5d5a3]/30'}`} onClick={() => setRating(star)} onMouseEnter={() => setHover(star)} onMouseLeave={() => setHover(rating)}><StarIcon filled={true} className="h-6 w-6" /></button> })}</div> }
 
 // 🌟 PRODUCT CARD 
-// 🚀 LEAD ENGINEER UPDATE: Added recommendationModel prop so the card knows which brain served it!
 function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, recommendationModel = "none" }: any) {
   const [addedEffect, setAddedEffect] = useState(false)
   const [imgLoaded, setImgLoaded] = useState(false)
   const [isGlittering, setIsGlittering] = useState(false)
 
-  // 🚀 AI TELEMETRY TRACKER
   const trackInteraction = (eventType: string) => {
       let sessionId = "unknown";
       if (typeof window !== "undefined") {
@@ -43,7 +41,7 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, rec
               user_id: sessionId,
               product_id: product.id,
               event_type: eventType,
-              recommendation_model: recommendationModel // Tells Python: "The Collaborative Brain got a click!"
+              recommendation_model: recommendationModel 
           })
       }).catch(err => console.log("Telemetry skipped"));
   }
@@ -55,14 +53,15 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, rec
           setTimeout(() => setIsGlittering(false), 700); 
       }
       onToggleWishlist(product);
-      trackInteraction('wishlist');
+      // 🚀 FIX 1: Splitting Wishlist State Telemetry
+      trackInteraction(isWishlisted ? 'remove_from_wishlist' : 'add_to_wishlist');
   }
 
   return (
     <article className="shrink-0 w-full sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-4.5rem)/4)] snap-start group relative flex flex-col overflow-hidden bg-[#2a0808] border border-[#e5d5a3]/20 transition-all duration-300 hover:border-[#e5d5a3]/60 hover:shadow-2xl rounded">
       <div className="relative aspect-[3/4] overflow-hidden bg-[#1a0505] flex items-center justify-center rounded-t group cursor-pointer">
-        {/* Track views on the image click */}
-        <Link href={`/product/${product.id}`} className="absolute inset-0 z-0" onClick={() => trackInteraction('view')}>
+        {/* 🚀 FIX 2: Appending ?ref= to pass attribution to the next page */}
+        <Link href={`/product/${product.id}?ref=${recommendationModel}`} className="absolute inset-0 z-0" onClick={() => trackInteraction('view')}>
             {product.image_url ? 
                 <img src={product.image_url} alt={product.name} onLoad={() => setImgLoaded(true)} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-110 ${imgLoaded ? 'image-loaded' : 'image-loading'}`} /> 
             : 
@@ -92,8 +91,8 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, rec
         </div>
       </div>
       <div className="flex flex-1 flex-col gap-2 p-4 bg-[#2a0808]">
-        {/* Track views on the text link click */}
-        <Link href={`/product/${product.id}`} className="hover:text-white transition-colors" onClick={() => trackInteraction('view')}>
+        {/* 🚀 FIX 2: Appending ?ref= to the text link as well */}
+        <Link href={`/product/${product.id}?ref=${recommendationModel}`} className="hover:text-white transition-colors" onClick={() => trackInteraction('view')}>
             <h3 className="font-serif text-lg font-medium tracking-wide text-[#e5d5a3] line-clamp-1">{product.name}</h3>
         </Link>
         <p className="font-sans text-base font-bold text-white/80">₹{product.price.toLocaleString("en-IN")}</p>
@@ -105,13 +104,15 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, rec
 export default function ProductPage() {
   const params: any = useParams()
   const router = useRouter()
+  
+  // 🚀 LEAD ENGINEER ADDITION: Read the URL to find out who sent us here!
+  const searchParams = useSearchParams()
+  const attributionRef = searchParams.get('ref') || 'direct_navigation'
+
   const [product, setProduct] = useState<any>(null)
   const [relatedProducts, setRelatedProducts] = useState<any[]>([])
   const [isFallback, setIsFallback] = useState(false) 
-  
-  // 🚀 LEAD ENGINEER ADDITION: Save WHICH AI Model gave us these recommendations
   const [activeModelName, setActiveModelName] = useState("none")
-
   const [loading, setLoading] = useState(true)
   const [buying, setBuying] = useState(false)
   const [isWishlisted, setIsWishlisted] = useState(false)
@@ -122,7 +123,6 @@ export default function ProductPage() {
   const [reviewForm, setReviewForm] = useState({ rating: 0, comment: '' })
   const [submitting, setSubmitting] = useState(false)
   const [wishlist, setWishlist] = useState<any[]>([])
-  
   const [activeImage, setActiveImage] = useState<string>("")
   const [animKey, setAnimKey] = useState(0)
 
@@ -168,12 +168,9 @@ export default function ProductPage() {
         let modelUsedTag = "none";
 
         try {
-            // 🚀 CALLING THE HYBRID ROUTER
             const aiResponse = await fetch(`http://127.0.0.1:8000/api/recommend/${mainProduct.id}`);
             if (aiResponse.ok) {
                 const aiData = await aiResponse.json();
-                
-                // 🚀 SAVE WHICH BRAIN WON THE COIN FLIP
                 modelUsedTag = aiData.model_used;
                 
                 const recommendedIds = aiData.recommendations.map((rec: any) => rec.id);
@@ -211,20 +208,20 @@ export default function ProductPage() {
         }
         
         setRelatedProducts(finalRelatedItems)
-        setActiveModelName(modelUsedTag) // 🚀 STORE IT IN REACT STATE
+        setActiveModelName(modelUsedTag) 
         setTimeout(handleScroll, 100);
 
         const currentWishlist = JSON.parse(localStorage.getItem('wishlist') || '[]'); setWishlist(currentWishlist)
         setIsWishlisted(currentWishlist.some((item: any) => item.id === mainProduct.id))
         await fetchReviews(mainProduct.id)
         
-        // Track the view for the MAIN product being loaded on the page
+        // 🚀 FIX 3: Track main page view with accurate Attribution Ref
         let sessionId = localStorage.getItem("lotus_session_id") || "sess_" + Math.random().toString(36).substring(2, 15);
         localStorage.setItem("lotus_session_id", sessionId);
         fetch("http://127.0.0.1:8000/api/track", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_id: sessionId, product_id: mainProduct.id, event_type: 'view', recommendation_model: "direct_navigation" })
+            body: JSON.stringify({ user_id: sessionId, product_id: mainProduct.id, event_type: 'view', recommendation_model: attributionRef })
         }).catch(() => {});
 
         const viewed = JSON.parse(localStorage.getItem('recentlyViewed') || '[]'); const newViewed = [mainProduct, ...viewed.filter((p: any) => p.id !== mainProduct.id)].slice(0, 10); localStorage.setItem('recentlyViewed', JSON.stringify(newViewed))
@@ -232,7 +229,7 @@ export default function ProductPage() {
       setLoading(false)
     }
     if (params.id) fetchData()
-  }, [params.id])
+  }, [params.id, attributionRef])
 
   const switchImage = (url: string) => {
       if (url === activeImage) return;
@@ -273,26 +270,26 @@ export default function ProductPage() {
     let newCart; if (existingIndex > -1) { newCart = [...existing]; newCart[existingIndex].quantity = (newCart[existingIndex].quantity || 1) + 1 } else { newCart = [...existing, { ...itemToAdd, quantity: 1 }] }
     localStorage.setItem('cart', JSON.stringify(newCart)); if (itemToAdd.id === product.id) { setAddedToCart(true); setTimeout(() => setAddedToCart(false), 2000) }
     
-    // Track cart adds for the MAIN product
+    // 🚀 FIX 4: Credit the AI if they click the Main Page Cart Button!
     if (itemToAdd.id === product.id) {
         let sessionId = localStorage.getItem("lotus_session_id") || "unknown";
         fetch("http://127.0.0.1:8000/api/track", {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_id: sessionId, product_id: product.id, event_type: 'add_to_cart', recommendation_model: "direct_interaction" })
+            body: JSON.stringify({ user_id: sessionId, product_id: product.id, event_type: 'add_to_cart', recommendation_model: attributionRef })
         }).catch(() => {});
     }
   }
 
   const toggleWishlist = () => { 
       const existing = JSON.parse(localStorage.getItem('wishlist') || '[]'); let updated; if (isWishlisted) { updated = existing.filter((p: any) => p.id !== product.id); setIsWishlisted(false) } else { updated = [...existing, product]; setIsWishlisted(true) } setWishlist(updated); localStorage.setItem('wishlist', JSON.stringify(updated)) 
-      // Track wishlist adds for the MAIN product
-      if (!isWishlisted) {
-          let sessionId = localStorage.getItem("lotus_session_id") || "unknown";
-          fetch("http://127.0.0.1:8000/api/track", {
-              method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ user_id: sessionId, product_id: product.id, event_type: 'wishlist', recommendation_model: "direct_interaction" })
-          }).catch(() => {});
-      }
+      
+      // 🚀 FIX 5: Split the Wishlist tracking AND pass attribution
+      const eventName = isWishlisted ? 'remove_from_wishlist' : 'add_to_wishlist';
+      let sessionId = localStorage.getItem("lotus_session_id") || "unknown";
+      fetch("http://127.0.0.1:8000/api/track", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: sessionId, product_id: product.id, event_type: eventName, recommendation_model: attributionRef })
+      }).catch(() => {});
   }
 
   const toggleWishlistRecommendation = (item: any) => { const exists = wishlist.find(i => i.id === item.id); let newW; if(exists) newW = wishlist.filter(i => i.id !== item.id); else newW = [...wishlist, item]; setWishlist(newW); localStorage.setItem('wishlist', JSON.stringify(newW)) }
@@ -382,7 +379,7 @@ export default function ProductPage() {
                               onAddToCart={() => handleAddToCart(item)} 
                               isWishlisted={wishlist.some(w => w.id === item.id)} 
                               onToggleWishlist={toggleWishlistRecommendation} 
-                              recommendationModel={activeModelName} // 🚀 PASS THE BRAIN NAME DOWN!
+                              recommendationModel={activeModelName} 
                           />
                       ))}
                   </div>
@@ -396,7 +393,7 @@ export default function ProductPage() {
           </section>
       )}
 
-      {/* REVIEWS SECTION (Unchanged) */}
+      {/* REVIEWS SECTION */}
       <div className="max-w-7xl mx-auto px-4 md:px-12 pt-8 border-t border-[#e5d5a3]/10">
         <h2 className="font-serif text-2xl text-[#f4e4bc] mb-8">Customer Reviews</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
