@@ -23,10 +23,30 @@ function StarRatingDisplay({ rating }: { rating: number }) { return <div classNa
 function StarRatingInput({ rating, setRating }: { rating: number, setRating: (r: number) => void }) { const [hover, setHover] = useState(0); return <div className="flex gap-1">{[1, 2, 3, 4, 5].map((star) => { const isFilled = star <= (hover || rating); return <button key={star} type="button" className={`focus:outline-none transition-colors duration-200 ${isFilled ? 'text-[#c5a059]' : 'text-[#e5d5a3]/30'}`} onClick={() => setRating(star)} onMouseEnter={() => setHover(star)} onMouseLeave={() => setHover(rating)}><StarIcon filled={true} className="h-6 w-6" /></button> })}</div> }
 
 // 🌟 PRODUCT CARD 
-function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist }: any) {
+// 🚀 LEAD ENGINEER UPDATE: Added recommendationModel prop so the card knows which brain served it!
+function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, recommendationModel = "none" }: any) {
   const [addedEffect, setAddedEffect] = useState(false)
   const [imgLoaded, setImgLoaded] = useState(false)
   const [isGlittering, setIsGlittering] = useState(false)
+
+  // 🚀 AI TELEMETRY TRACKER
+  const trackInteraction = (eventType: string) => {
+      let sessionId = "unknown";
+      if (typeof window !== "undefined") {
+          sessionId = localStorage.getItem("lotus_session_id") || "sess_" + Math.random().toString(36).substring(2, 15);
+          localStorage.setItem("lotus_session_id", sessionId);
+      }
+      fetch("http://127.0.0.1:8000/api/track", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+              user_id: sessionId,
+              product_id: product.id,
+              event_type: eventType,
+              recommendation_model: recommendationModel // Tells Python: "The Collaborative Brain got a click!"
+          })
+      }).catch(err => console.log("Telemetry skipped"));
+  }
 
   const handleWishlistClick = (e: React.MouseEvent) => {
       e.preventDefault(); 
@@ -35,13 +55,14 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist }: a
           setTimeout(() => setIsGlittering(false), 700); 
       }
       onToggleWishlist(product);
+      trackInteraction('wishlist');
   }
 
   return (
-    // LEAD ENGINEER CSS MATH: Exactly 1 card on mobile, 2 on tablet, and exactly 4 on Desktop. Snap to start!
     <article className="shrink-0 w-full sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-4.5rem)/4)] snap-start group relative flex flex-col overflow-hidden bg-[#2a0808] border border-[#e5d5a3]/20 transition-all duration-300 hover:border-[#e5d5a3]/60 hover:shadow-2xl rounded">
       <div className="relative aspect-[3/4] overflow-hidden bg-[#1a0505] flex items-center justify-center rounded-t group cursor-pointer">
-        <Link href={`/product/${product.id}`} className="absolute inset-0 z-0">
+        {/* Track views on the image click */}
+        <Link href={`/product/${product.id}`} className="absolute inset-0 z-0" onClick={() => trackInteraction('view')}>
             {product.image_url ? 
                 <img src={product.image_url} alt={product.name} onLoad={() => setImgLoaded(true)} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-110 ${imgLoaded ? 'image-loaded' : 'image-loading'}`} /> 
             : 
@@ -59,13 +80,22 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist }: a
             <HeartIcon className={`h-4 w-4 relative z-10 ${isWishlisted ? "fill-red-600 text-red-600" : ""}`} filled={isWishlisted} />
         </button>
         <div className="absolute inset-x-0 bottom-0 z-20 translate-y-full transition-transform duration-300 group-hover:translate-y-0">
-            <button onClick={(e) => { e.preventDefault(); onAddToCart(product); setAddedEffect(true); setTimeout(() => setAddedEffect(false), 2000); }} className={`w-full py-3 font-sans text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-300 ${addedEffect ? "bg-green-700 text-white" : "bg-[#e5d5a3] text-[#1a0505] hover:bg-white"}`}>
+            <button onClick={(e) => { 
+                e.preventDefault(); 
+                onAddToCart(product); 
+                setAddedEffect(true); 
+                setTimeout(() => setAddedEffect(false), 2000);
+                trackInteraction('add_to_cart');
+            }} className={`w-full py-3 font-sans text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-300 ${addedEffect ? "bg-green-700 text-white" : "bg-[#e5d5a3] text-[#1a0505] hover:bg-white"}`}>
                 {addedEffect ? (<div className="flex items-center gap-2"><CheckIcon className="h-5 w-5 animate-check" /> <span className="animate-pulse">Added</span></div>) : (<><ShoppingBagIcon className="h-4 w-4" /> Add to Cart</>)}
             </button>
         </div>
       </div>
       <div className="flex flex-1 flex-col gap-2 p-4 bg-[#2a0808]">
-        <Link href={`/product/${product.id}`} className="hover:text-white transition-colors"><h3 className="font-serif text-lg font-medium tracking-wide text-[#e5d5a3] line-clamp-1">{product.name}</h3></Link>
+        {/* Track views on the text link click */}
+        <Link href={`/product/${product.id}`} className="hover:text-white transition-colors" onClick={() => trackInteraction('view')}>
+            <h3 className="font-serif text-lg font-medium tracking-wide text-[#e5d5a3] line-clamp-1">{product.name}</h3>
+        </Link>
         <p className="font-sans text-base font-bold text-white/80">₹{product.price.toLocaleString("en-IN")}</p>
       </div>
     </article>
@@ -78,6 +108,10 @@ export default function ProductPage() {
   const [product, setProduct] = useState<any>(null)
   const [relatedProducts, setRelatedProducts] = useState<any[]>([])
   const [isFallback, setIsFallback] = useState(false) 
+  
+  // 🚀 LEAD ENGINEER ADDITION: Save WHICH AI Model gave us these recommendations
+  const [activeModelName, setActiveModelName] = useState("none")
+
   const [loading, setLoading] = useState(true)
   const [buying, setBuying] = useState(false)
   const [isWishlisted, setIsWishlisted] = useState(false)
@@ -107,7 +141,6 @@ export default function ProductPage() {
 
   const scrollCarousel = (direction: 'left' | 'right') => {
       if (carouselRef.current) {
-          // Because items are perfectly sized to 4 per viewport, sweeping 1 full clientWidth naturally grabs the next 4 items!
           const visibleWidth = carouselRef.current.clientWidth;
           const scrollAmount = direction === 'left' ? -visibleWidth : visibleWidth; 
           carouselRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
@@ -132,10 +165,17 @@ export default function ProductPage() {
         setActiveImage(mainProduct.image_url)
         
         let finalRelatedItems: any[] = [];
+        let modelUsedTag = "none";
+
         try {
+            // 🚀 CALLING THE HYBRID ROUTER
             const aiResponse = await fetch(`http://127.0.0.1:8000/api/recommend/${mainProduct.id}`);
             if (aiResponse.ok) {
                 const aiData = await aiResponse.json();
+                
+                // 🚀 SAVE WHICH BRAIN WON THE COIN FLIP
+                modelUsedTag = aiData.model_used;
+                
                 const recommendedIds = aiData.recommendations.map((rec: any) => rec.id);
                 if (recommendedIds.length > 0) {
                     const { data: aiProducts } = await supabase
@@ -158,6 +198,7 @@ export default function ProductPage() {
 
         if (finalRelatedItems.length === 0) {
             setIsFallback(true) 
+            modelUsedTag = "database_fallback";
             const { data: fallbackItems } = await supabase.from('products').select('*').eq('category', mainProduct.category).neq('id', mainProduct.id).limit(10);
             if (!fallbackItems || fallbackItems.length === 0) {
                  const { data: ultimateFallback } = await supabase.from('products').select('*').neq('id', mainProduct.id).limit(10);
@@ -170,12 +211,22 @@ export default function ProductPage() {
         }
         
         setRelatedProducts(finalRelatedItems)
-        // Set initial scroll state after items load
+        setActiveModelName(modelUsedTag) // 🚀 STORE IT IN REACT STATE
         setTimeout(handleScroll, 100);
 
         const currentWishlist = JSON.parse(localStorage.getItem('wishlist') || '[]'); setWishlist(currentWishlist)
         setIsWishlisted(currentWishlist.some((item: any) => item.id === mainProduct.id))
         await fetchReviews(mainProduct.id)
+        
+        // Track the view for the MAIN product being loaded on the page
+        let sessionId = localStorage.getItem("lotus_session_id") || "sess_" + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem("lotus_session_id", sessionId);
+        fetch("http://127.0.0.1:8000/api/track", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: sessionId, product_id: mainProduct.id, event_type: 'view', recommendation_model: "direct_navigation" })
+        }).catch(() => {});
+
         const viewed = JSON.parse(localStorage.getItem('recentlyViewed') || '[]'); const newViewed = [mainProduct, ...viewed.filter((p: any) => p.id !== mainProduct.id)].slice(0, 10); localStorage.setItem('recentlyViewed', JSON.stringify(newViewed))
       }
       setLoading(false)
@@ -221,9 +272,29 @@ export default function ProductPage() {
     const existing = JSON.parse(localStorage.getItem('cart') || '[]'); const existingIndex = existing.findIndex((i: any) => i.id === itemToAdd.id)
     let newCart; if (existingIndex > -1) { newCart = [...existing]; newCart[existingIndex].quantity = (newCart[existingIndex].quantity || 1) + 1 } else { newCart = [...existing, { ...itemToAdd, quantity: 1 }] }
     localStorage.setItem('cart', JSON.stringify(newCart)); if (itemToAdd.id === product.id) { setAddedToCart(true); setTimeout(() => setAddedToCart(false), 2000) }
+    
+    // Track cart adds for the MAIN product
+    if (itemToAdd.id === product.id) {
+        let sessionId = localStorage.getItem("lotus_session_id") || "unknown";
+        fetch("http://127.0.0.1:8000/api/track", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: sessionId, product_id: product.id, event_type: 'add_to_cart', recommendation_model: "direct_interaction" })
+        }).catch(() => {});
+    }
   }
 
-  const toggleWishlist = () => { const existing = JSON.parse(localStorage.getItem('wishlist') || '[]'); let updated; if (isWishlisted) { updated = existing.filter((p: any) => p.id !== product.id); setIsWishlisted(false) } else { updated = [...existing, product]; setIsWishlisted(true) } setWishlist(updated); localStorage.setItem('wishlist', JSON.stringify(updated)) }
+  const toggleWishlist = () => { 
+      const existing = JSON.parse(localStorage.getItem('wishlist') || '[]'); let updated; if (isWishlisted) { updated = existing.filter((p: any) => p.id !== product.id); setIsWishlisted(false) } else { updated = [...existing, product]; setIsWishlisted(true) } setWishlist(updated); localStorage.setItem('wishlist', JSON.stringify(updated)) 
+      // Track wishlist adds for the MAIN product
+      if (!isWishlisted) {
+          let sessionId = localStorage.getItem("lotus_session_id") || "unknown";
+          fetch("http://127.0.0.1:8000/api/track", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ user_id: sessionId, product_id: product.id, event_type: 'wishlist', recommendation_model: "direct_interaction" })
+          }).catch(() => {});
+      }
+  }
+
   const toggleWishlistRecommendation = (item: any) => { const exists = wishlist.find(i => i.id === item.id); let newW; if(exists) newW = wishlist.filter(i => i.id !== item.id); else newW = [...wishlist, item]; setWishlist(newW); localStorage.setItem('wishlist', JSON.stringify(newW)) }
   const handleSubmitReview = async (e: React.FormEvent) => { e.preventDefault(); if (!user) return alert("Please log in first."); if (reviewForm.rating === 0) return alert("Please give a star rating."); setSubmitting(true); const { error } = await supabase.from('reviews').insert({ product_id: product.id, user_id: user.id, user_email: user.email, rating: reviewForm.rating, comment: reviewForm.comment }); if (error) { alert("Error: " + error.message) } else { setReviewForm({ rating: 0, comment: '' }); await fetchReviews(product.id) } setSubmitting(false) }
 
@@ -246,35 +317,21 @@ export default function ProductPage() {
         <div className="self-start sticky top-24">
             <div className="bg-[#2a0808] border border-[#e5d5a3]/20 p-2 relative shadow-2xl rounded group overflow-hidden">
                 <div className="aspect-[3/4] bg-[#1a0505] flex items-center justify-center overflow-hidden relative rounded-sm">
-                    {/* 🌟 MAIN IMAGE (No Zoom) */}
                     {activeImage ? 
-                        <img 
-                            key={animKey}
-                            src={activeImage} 
-                            className="w-full h-full object-cover rounded-sm animate-fade-in" 
-                        /> 
+                        <img key={animKey} src={activeImage} className="w-full h-full object-cover rounded-sm animate-fade-in" /> 
                     : <span className="text-[#e5d5a3]/30 tracking-widest">IMAGE</span>}
                 </div>
                 <button onClick={toggleWishlist} className={`md:hidden absolute top-4 right-4 h-10 w-10 bg-[#1a0505]/80 backdrop-blur rounded-full flex items-center justify-center border transition-colors z-10 ${isWishlisted ? 'border-[#c5a059] text-red-600' : 'border-[#e5d5a3]/30 text-[#e5d5a3]'}`}><HeartIcon filled={isWishlisted} className="h-5 w-5" /></button>
             </div>
 
-            {/* 🌟 THUMBNAIL STRIP (Apple Style) 🌟 */}
             {product.gallery && product.gallery.length > 1 && (
                 <div className="flex gap-4 mt-6 overflow-x-auto pb-4 px-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
                     {product.gallery.map((img: string, idx: number) => (
                         <button key={idx} className="relative group/thumb cursor-pointer pb-2" onClick={() => switchImage(img)}>
-                            {/* THUMBNAIL */}
                             <div className={`w-20 h-20 rounded-lg border overflow-hidden transition-all duration-300 ${activeImage === img ? 'border-[#e5d5a3]/50 opacity-100' : 'border-transparent opacity-50 hover:opacity-100'}`}>
                                 <img src={img} className="w-full h-full object-cover" />
                             </div>
-                            
-                            {/* 🌟 INTERACTIVE LINE LOGIC */}
-                            <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 rounded-full transition-all duration-300 ease-out 
-                                ${activeImage === img 
-                                    ? 'w-8 bg-[#c5a059] opacity-100' 
-                                    : 'w-0 opacity-0 group-hover/thumb:w-8 group-hover/thumb:bg-[#e5d5a3] group-hover/thumb:opacity-70' 
-                                }`}>
-                            </div>
+                            <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 rounded-full transition-all duration-300 ease-out ${activeImage === img ? 'w-8 bg-[#c5a059] opacity-100' : 'w-0 opacity-0 group-hover/thumb:w-8 group-hover/thumb:bg-[#e5d5a3] group-hover/thumb:opacity-70'}`}></div>
                         </button>
                     ))}
                 </div>
@@ -309,30 +366,15 @@ export default function ProductPage() {
       {/* 🚀 THE ROYAL CAROUSEL 🚀 */}
       {relatedProducts.length > 0 && (
           <section className="w-full py-16 border-t border-[#e5d5a3]/10 relative">
-              {/* Header aligns exactly with the gallery above */}
               <div className="max-w-7xl mx-auto px-4 md:px-12 mb-8 flex justify-between items-end">
                   <h2 className="font-serif text-2xl text-[#f4e4bc] tracking-wide">You Might Also Like</h2>
                   <Link href={`/${getCategorySlug()}`} className="text-xs text-[#c5a059] border-b border-[#c5a059] pb-1 hover:text-white hover:border-white transition-all uppercase tracking-widest hidden md:block">View Full Collection</Link>
               </div>
 
-              {/* LEAD ENGINEER FIX: Increased horizontal padding to px-20 to create a wider gutter for the buttons */}
               <div className="relative max-w-7xl mx-auto px-4 md:px-20 group/carousel">
-                  
-                  {/* Left Button: Moved from left-0 to left-4 to float centrally in the new, wider gutter */}
-                  <button 
-                      onClick={() => scrollCarousel('left')}
-                      disabled={!canScrollLeft}
-                      className={`hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-30 h-12 w-12 items-center justify-center rounded-full bg-[#1a0505]/90 backdrop-blur border border-[#c5a059]/30 text-[#e5d5a3] shadow-xl transition-all duration-300 disabled:opacity-0 disabled:pointer-events-none hover:bg-[#c5a059] hover:text-[#1a0505]`}
-                  >
-                      <ChevronLeftIcon />
-                  </button>
+                  <button onClick={() => scrollCarousel('left')} disabled={!canScrollLeft} className={`hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-30 h-12 w-12 items-center justify-center rounded-full bg-[#1a0505]/90 backdrop-blur border border-[#c5a059]/30 text-[#e5d5a3] shadow-xl transition-all duration-300 disabled:opacity-0 disabled:pointer-events-none hover:bg-[#c5a059] hover:text-[#1a0505]`}><ChevronLeftIcon /></button>
 
-                  {/* The Scrolling Track */}
-                  <div 
-                      ref={carouselRef}
-                      onScroll={handleScroll}
-                      className="flex gap-6 overflow-x-auto pb-8 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] scroll-smooth"
-                  >
+                  <div ref={carouselRef} onScroll={handleScroll} className="flex gap-6 overflow-x-auto pb-8 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] scroll-smooth">
                       {relatedProducts.map((item) => (
                           <ProductCard 
                               key={item.id} 
@@ -340,18 +382,12 @@ export default function ProductPage() {
                               onAddToCart={() => handleAddToCart(item)} 
                               isWishlisted={wishlist.some(w => w.id === item.id)} 
                               onToggleWishlist={toggleWishlistRecommendation} 
+                              recommendationModel={activeModelName} // 🚀 PASS THE BRAIN NAME DOWN!
                           />
                       ))}
                   </div>
 
-                  {/* Right Button: Moved from right-0 to right-4 to float centrally in the new, wider gutter */}
-                  <button 
-                      onClick={() => scrollCarousel('right')}
-                      disabled={!canScrollRight}
-                      className={`hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-30 h-12 w-12 items-center justify-center rounded-full bg-[#1a0505]/90 backdrop-blur border border-[#c5a059]/30 text-[#e5d5a3] shadow-xl transition-all duration-300 disabled:opacity-0 disabled:pointer-events-none hover:bg-[#c5a059] hover:text-[#1a0505]`}
-                  >
-                      <ChevronRightIcon />
-                  </button>
+                  <button onClick={() => scrollCarousel('right')} disabled={!canScrollRight} className={`hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-30 h-12 w-12 items-center justify-center rounded-full bg-[#1a0505]/90 backdrop-blur border border-[#c5a059]/30 text-[#e5d5a3] shadow-xl transition-all duration-300 disabled:opacity-0 disabled:pointer-events-none hover:bg-[#c5a059] hover:text-[#1a0505]`}><ChevronRightIcon /></button>
               </div>
               
               <div className="max-w-7xl mx-auto px-4 mt-4 md:hidden text-center">
@@ -360,6 +396,7 @@ export default function ProductPage() {
           </section>
       )}
 
+      {/* REVIEWS SECTION (Unchanged) */}
       <div className="max-w-7xl mx-auto px-4 md:px-12 pt-8 border-t border-[#e5d5a3]/10">
         <h2 className="font-serif text-2xl text-[#f4e4bc] mb-8">Customer Reviews</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">

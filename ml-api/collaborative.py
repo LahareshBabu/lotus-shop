@@ -3,6 +3,25 @@ from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import os
+import requests # 🚀 ADDED: To fetch names from Supabase
+
+# 1. YOUR SUPABASE CONFIGURATION
+SUPABASE_URL = "https://fwyliqsazdyprlkemavu.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3eWxpcXNhemR5cHJsa2VtYXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzOTg2MzIsImV4cCI6MjA4NTk3NDYzMn0.dXkx1pEtiZ5uwcQJgisJs14ZyUJTuz-SomMCeZv-jbE"
+
+def fetch_product_names():
+    """Fetches the ID and Name of all products from Supabase to translate math back into English."""
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}"
+    }
+    response = requests.get(f"{SUPABASE_URL}/rest/v1/products?select=id,name", headers=headers)
+    if response.status_code != 200:
+        print("❌ Failed to fetch products from Supabase!")
+        return {}
+    
+    # Create a quick lookup dictionary: {14: "Majestic Chevron...", 7: "Royal Peacock..."}
+    return {p['id']: p['name'] for p in response.json()}
 
 def get_collaborative_recommendations(target_item_id, top_n=5):
     """
@@ -61,17 +80,28 @@ def get_collaborative_recommendations(target_item_id, top_n=5):
     similarity_scores = list(enumerate(similarity_matrix[target_index]))
     similarity_scores = sorted(similarity_scores, key=lambda x: x[1], reverse=True)
 
+    # 🚀 NEW: Grab the dictionary of names from Supabase
+    product_dict = fetch_product_names()
+
     recommendations = []
     # Skip the very first result (it will always be the item itself comparing to itself)
     for i, score in similarity_scores[1:top_n+1]:
-        recommended_item_id = item_indices[i]
-        recommendations.append(int(recommended_item_id))
+        recommended_item_id = int(item_indices[i])
+        item_name = product_dict.get(recommended_item_id, "Unknown Product")
+        
+        # 🚀 NEW: Standardize the output so it exactly matches the Content-Based brain!
+        recommendations.append({
+            "id": recommended_item_id,
+            "name": item_name,
+            "match_score": round(float(score) * 100, 2) # Convert decimal math to a clean percentage
+        })
 
     return recommendations
 
 # --- Quick Local Test ---
 if __name__ == "__main__":
+    import json
     # Test the math locally. Pick an ID from your database that you know exists!
     test_id = 14 
     print(f"Collaborative Recommendations for Item {test_id}:")
-    print(get_collaborative_recommendations(test_id))
+    print(json.dumps(get_collaborative_recommendations(test_id), indent=2))
