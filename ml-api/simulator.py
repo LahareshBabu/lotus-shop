@@ -1,7 +1,7 @@
 import csv
 import random
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import requests
 import os
 
@@ -60,8 +60,8 @@ def generate_synthetic_data(num_users=1000):
             # 2. Decide how active they are (between 3 to 10 clicks)
             num_clicks = random.randint(3, 10)
             
-            # Generate a random date within the last 30 days
-            base_time = datetime.utcnow() - timedelta(days=random.randint(0, 30), hours=random.randint(0, 23))
+            # Generate a random date within the last 30 days (FUTURE-PROOFED)
+            base_time = datetime.now(timezone.utc) - timedelta(days=random.randint(0, 30), hours=random.randint(0, 23))
 
             for _ in range(num_clicks):
                 # 80% chance they click something in their favorite category (Realistic behavior)

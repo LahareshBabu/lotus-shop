@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from recommender import get_recommendations
-from datetime import datetime
+from datetime import datetime, timezone
 import csv
 import os
 
@@ -64,9 +64,9 @@ async def track_interaction(interaction: Interaction):
         if not file_exists:
             writer.writerow(["timestamp", "user_id", "product_id", "event_type", "recommendation_model"])
         
-        # Write the actual data row
+        # Write the actual data row (FUTURE-PROOFED)
         writer.writerow([
-            datetime.utcnow().isoformat(),
+            datetime.now(timezone.utc).isoformat(),
             interaction.user_id,
             interaction.product_id,
             interaction.event_type,
