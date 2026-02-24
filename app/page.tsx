@@ -113,6 +113,28 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
   const [imgLoaded, setImgLoaded] = useState(false)
   const [isGlittering, setIsGlittering] = useState(false)
 
+  // 🚀 LEAD ENGINEER ADDITION: The Telemetry Tracker
+  const trackInteraction = (eventType: string) => {
+      // Create a persistent anonymous session ID if none exists
+      let sessionId = "unknown";
+      if (typeof window !== "undefined") {
+          sessionId = localStorage.getItem("lotus_session_id") || "sess_" + Math.random().toString(36).substring(2, 15);
+          localStorage.setItem("lotus_session_id", sessionId);
+      }
+
+      // Secretly ping the Python Data Lake
+      fetch("http://127.0.0.1:8000/api/track", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+              user_id: sessionId,
+              product_id: product.id,
+              event_type: eventType,
+              recommendation_model: "homepage_featured" // Tells AI where this click came from
+          })
+      }).catch(err => console.log("Telemetry skipped (Server might be sleeping)"));
+  }
+
   const handleWishlistClick = (e: React.MouseEvent) => {
       e.preventDefault(); 
       if (!isWishlisted) {
@@ -120,46 +142,54 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
           setTimeout(() => setIsGlittering(false), 700); 
       }
       onToggleWishlist(product);
+      // Track wishlist adds!
+      trackInteraction('wishlist');
   }
 
   return (
     <article 
-        // 🌟 FIX 1 & 2: Added hover:z-20 (prevent glow bleed), hover:-translate-y-2 (lift), and animate-fade-up-stagger
         className="group relative flex flex-col overflow-hidden bg-[#2a0808] border border-[#e5d5a3]/20 rounded transition-all duration-500 ease-out hover:-translate-y-2 hover:z-20 hover:shadow-[0_15px_40px_rgba(197,160,89,0.15)] hover:border-[#c5a059]/50 animate-fade-up-stagger"
         style={{ animationDelay: `${index * 100}ms` }}
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-[#1a0505] flex items-center justify-center rounded-t cursor-pointer">
-        <Link href={`/product/${product.id}`} className="absolute inset-0 z-0">
+        {/* 🚀 AI TRACKER ATTACHED: Logs when a user clicks to view a product */}
+        <Link href={`/product/${product.id}`} className="absolute inset-0 z-0" onClick={() => trackInteraction('view')}>
             {product.image_url ? 
                 <img 
                     src={product.image_url} 
                     alt={product.name} 
                     onLoad={() => setImgLoaded(true)}
-                    // 🌟 FIX 4: OPTIMAL ZOOM - Changed to duration-700 ease-out group-hover:scale-105 for smooth, subtle premium zoom
-                    className={`h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 ${imgLoaded ? 'opacity-100' : 'opacity-0 blur-sm'}`} 
+                    className={`h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 ${imgLoaded ? 'opacity-100' : 'opacity-0 blur-sm'} transition-all`} 
                 /> 
             : 
                 <div className="flex flex-col items-center justify-center text-[#e5d5a3]/30 h-full"><span className="font-serif text-lg tracking-widest">IMAGE</span></div>
             }
         </Link>
-        {product.id === 1 && <span className="absolute left-3 top-3 bg-[#e5d5a3] px-3 py-1 font-sans text-[10px] font-bold uppercase text-[#1a0505] rounded-sm z-10">BESTSELLER</span>}
+
+        {product.id === 1 && <span className="absolute left-3 top-3 bg-[#e5d5a3] px-3 py-1 font-sans text-[10px] font-bold uppercase text-[#1a0505] rounded-sm z-10 shadow-lg">BESTSELLER</span>}
         
-        <button onClick={handleWishlistClick} className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-[#1a0505]/60 backdrop-blur-sm hover:bg-[#e5d5a3] hover:text-[#1a0505] text-[#e5d5a3] border border-[#e5d5a3]/30 z-20 transition-colors">
+        <button onClick={handleWishlistClick} className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-[#1a0505]/60 backdrop-blur-md hover:bg-[#e5d5a3] hover:text-[#1a0505] text-[#e5d5a3] border border-[#e5d5a3]/30 z-20 transition-colors duration-300">
             {isGlittering && (
                 <>
-                    <span className="heart-particle p-1 animate-heart-burst hp-red">♥</span><span className="heart-particle p-2 animate-heart-burst hp-gold">♥</span><span className="heart-particle p-3 animate-heart-burst hp-red">♥</span><span className="heart-particle p-4 animate-heart-burst hp-gold">♥</span>
-                    <span className="heart-particle p-5 animate-heart-burst hp-red">♥</span><span className="heart-particle p-6 animate-heart-burst hp-gold">♥</span><span className="heart-particle p-7 animate-heart-burst hp-red">♥</span><span className="heart-particle p-8 animate-heart-burst hp-gold">♥</span>
-                    <span className="heart-particle p-9 animate-heart-burst hp-gold">♥</span><span className="heart-particle p-10 animate-heart-burst hp-red">♥</span><span className="heart-particle p-11 animate-heart-burst hp-gold">♥</span><span className="heart-particle p-12 animate-heart-burst hp-red">♥</span>
+                    <i className="heart-particle p-1 animate-heart-burst hp-red">♥</i><i className="heart-particle p-2 animate-heart-burst hp-gold">♥</i><i className="heart-particle p-3 animate-heart-burst hp-red">♥</i><i className="heart-particle p-4 animate-heart-burst hp-gold">♥</i>
+                    <i className="heart-particle p-5 animate-heart-burst hp-red">♥</i><i className="heart-particle p-6 animate-heart-burst hp-gold">♥</i><i className="heart-particle p-7 animate-heart-burst hp-red">♥</i><i className="heart-particle p-8 animate-heart-burst hp-gold">♥</i>
+                    <i className="heart-particle p-9 animate-heart-burst hp-gold">♥</i><i className="heart-particle p-10 animate-heart-burst hp-red">♥</i><i className="heart-particle p-11 animate-heart-burst hp-gold">♥</i><i className="heart-particle p-12 animate-heart-burst hp-red">♥</i>
                 </>
             )}
-            <HeartIcon className={`h-4 w-4 relative z-10 ${isWishlisted ? "fill-red-600 text-red-600" : ""}`} filled={isWishlisted} />
+            <HeartIcon className={`h-4 w-4 relative z-10 transition-transform duration-300 group-hover:scale-110 ${isWishlisted ? "fill-red-600 text-red-600" : ""}`} filled={isWishlisted} />
         </button>
 
-        <div className="absolute inset-x-0 bottom-0 z-20 translate-y-full transition-transform duration-300 group-hover:translate-y-0">
+        <div className="absolute inset-x-0 bottom-0 z-20 translate-y-full transition-transform duration-300 ease-out group-hover:translate-y-0">
             <button 
-                onClick={(e) => { e.preventDefault(); onAddToCart(product); setAddedEffect(true); setTimeout(() => setAddedEffect(false), 2000); }} 
-                // 🌟 FIX 3: Standardized to py-3 (smaller, sleeker button)
-                className={`w-full py-3 font-sans text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-300 ${addedEffect ? "bg-green-700 text-white" : "bg-[#e5d5a3] text-[#1a0505] hover:bg-white"}`}
+                onClick={(e) => { 
+                    e.preventDefault(); 
+                    onAddToCart(product); 
+                    setAddedEffect(true); 
+                    setTimeout(() => setAddedEffect(false), 2000); 
+                    // 🚀 AI TRACKER ATTACHED: Logs an Add To Cart event!
+                    trackInteraction('add_to_cart');
+                }} 
+                className={`w-full py-3 font-sans text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-300 ${addedEffect ? "bg-green-700 text-white" : "bg-[#e5d5a3]/90 backdrop-blur text-[#1a0505] hover:bg-white"}`}
             >
                 {addedEffect ? (
                     <div className="flex items-center gap-2"><CheckIcon className="h-5 w-5 animate-check" /> <span className="animate-pulse">Added</span></div>
@@ -169,9 +199,13 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
             </button>
         </div>
       </div>
-      <div className="flex flex-1 flex-col gap-2 p-4 bg-[#2a0808]">
-        <Link href={`/product/${product.id}`} className="hover:text-white transition-colors"><h3 className="font-serif text-lg font-medium tracking-wide text-[#e5d5a3]">{product.name}</h3></Link>
-        <p className="font-sans text-base font-bold text-white/80">₹{product.price.toLocaleString("en-IN")}</p>
+      
+      <div className="flex flex-1 flex-col gap-2 p-5 bg-gradient-to-b from-[#2a0808] to-[#1a0505]">
+        {/* 🚀 AI TRACKER ATTACHED: Logs when a user clicks the title link */}
+        <Link href={`/product/${product.id}`} className="hover:text-[#c5a059] transition-colors duration-300" onClick={() => trackInteraction('view')}>
+            <h3 className="font-serif text-lg font-medium tracking-wide text-[#e5d5a3]">{product.name}</h3>
+        </Link>
+        <p className="font-sans text-base font-bold text-[#f4e4bc]">₹{product.price.toLocaleString("en-IN")}</p>
       </div>
     </article>
   )
@@ -246,14 +280,10 @@ export default function Page() {
 
   useEffect(() => {
     async function init() {
-        // 🌟 IVY LEAGUE CACHING ARCHITECTURE: Fetching from our custom API instead of direct DB
         try {
             const res = await fetch('/api/products');
             const json = await res.json();
             if (json.products) setProducts(json.products);
-            
-            // Console log so you can proudly watch it hit the cache!
-            console.log("Data Source:", json.source); 
         } catch (error) {
             console.error("Failed to fetch products", error);
         }
@@ -299,7 +329,6 @@ export default function Page() {
     <main className="min-h-screen bg-[#1a0505] text-[#e5d5a3] relative font-sans">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" />
       
-      {/* 🌟 CUSTOM ANIMATION STYLES INJECTED HERE TO SUPPORT HOMEPAGE 🌟 */}
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes fadeUpStagger {
           0% { opacity: 0; transform: translateY(30px) scale(0.98); }
@@ -397,10 +426,8 @@ export default function Page() {
                             <h3 className="font-serif text-2xl text-[#c5a059] mb-6 tracking-wide border-b border-[#e5d5a3]/10 pb-2">{category.name} Collection</h3>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-8">
                                 {category.items.map((item, idx) => (
-                                    // 🌟 SMART LINK: Uses 'searchQuery' to guarantee results
                                     <Link key={idx} href={`/shop/search?q=${encodeURIComponent(item.searchQuery)}`} className="group/item block p-4 rounded hover:bg-[#2a0808] transition-colors border border-transparent hover:border-[#e5d5a3]/10">
                                         <div className="font-bold text-[#e5d5a3] group-hover/item:text-white text-base mb-1">{item.name}</div>
-                                        {/* The Finish Types */}
                                         <div className="text-[10px] text-[#e5d5a3]/50 uppercase tracking-wider group-hover/item:text-[#c5a059] transition-colors">{item.types}</div>
                                     </Link>
                                 ))}
@@ -413,7 +440,6 @@ export default function Page() {
       </header>
       {/* 🌟 HEADER END 🌟 */}
 
-      {/* REST OF PAGE (Login, Sidebars, Hero, Featured, Footer) */}
       {isLoginOpen && (<div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"><div className="bg-[#2a0808] border border-[#e5d5a3]/30 p-8 w-full max-w-md shadow-2xl relative"><button onClick={() => setIsLoginOpen(false)} className="absolute top-4 right-4 text-[#e5d5a3]/50 hover:text-white"><XIcon /></button><h2 className="font-serif text-2xl text-[#f4e4bc] mb-2 text-center">Member Login</h2><p className="text-center text-[#e5d5a3]/50 text-xs mb-6 uppercase tracking-widest">We will send a magic link to your email</p>{!loginMessage ? (<form onSubmit={handleLogin} className="space-y-4"><input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" className="w-full bg-[#1a0505] border border-[#e5d5a3]/20 p-3 text-[#e5d5a3] outline-none focus:border-[#e5d5a3]" /><button disabled={loadingLogin} className="w-full bg-[#e5d5a3] text-[#1a0505] py-3 font-bold uppercase tracking-widest hover:bg-white disabled:opacity-50">{loadingLogin ? "Sending..." : "Send Login Link"}</button></form>) : (<div className="text-center text-green-400 p-4 border border-green-500/20 bg-green-500/10">{loginMessage}</div>)}</div></div>)}
       
       <div className={`fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${mobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setMobileMenuOpen(false)} />
@@ -434,7 +460,6 @@ export default function Page() {
       <div className={`fixed top-0 right-0 z-50 h-full w-full max-w-sm bg-[#1a0505] border-l border-[#e5d5a3]/20 shadow-2xl transition-transform duration-300 transform ${isWishlistOpen ? 'translate-x-0' : 'translate-x-full'} flex flex-col`}>
           <div className="flex items-center justify-between p-6 border-b border-[#e5d5a3]/10 pb-4"><h2 className="font-serif text-xl font-bold tracking-wide text-[#f4e4bc]">Your Favorites</h2><button onClick={() => setIsWishlistOpen(false)} className="text-[#e5d5a3]/60 hover:text-white"><XIcon className="w-6 h-6" /></button></div>
           <div className="flex-1 overflow-y-auto space-y-4 p-6 [&::-webkit-scrollbar]:w-3.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[#c5a059] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border-[3px] [&::-webkit-scrollbar-thumb]:border-solid [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:[background-clip:padding-box] hover:[&::-webkit-scrollbar-thumb]:bg-[#e5d5a3]">
-              {/* 🚀 LEAD ENGINEER FIX: Removed .slice(0, 5) and safely cloned array before reversing! 🚀 */}
               {wishlist.length === 0 ? <p className="text-center text-[#e5d5a3]/40 italic mt-10">No favorites yet.</p> : [...wishlist].reverse().map((item) => ( 
                   <div key={item.id} className="flex gap-4 p-2 border-b border-[#e5d5a3]/10 items-center">
                       <div className="h-14 w-14 bg-[#2a0808] rounded overflow-hidden"><img src={item.image_url} className="h-full w-full object-cover" /></div>
@@ -476,7 +501,6 @@ export default function Page() {
             {products.length === 0 ? (
                 <div className="col-span-4 py-20 text-center border border-dashed border-[#e5d5a3]/20 rounded bg-[#2a0808]/50"><p className="text-[#e5d5a3]/50 font-serif text-lg">Loading your collection...</p></div>
             ) : (
-                // 🌟 FIX 1 & 2 Application: Passed index to ProductCard for staggered animation
                 products.map((product, index) => (<ProductCard key={product.id} index={index} product={product} onAddToCart={addToCart} isWishlisted={wishlist.some(item => item.id === product.id)} onToggleWishlist={toggleWishlist} />))
             )}
         </div>

@@ -1,0 +1,4 @@
+timestamp,user_id,product_id,event_type,recommendation_model
+2026-02-24T07:43:54.698069,sess_y3qe8x6jjw,14,wishlist,homepage_featured
+2026-02-24T07:43:55.964665,sess_y3qe8x6jjw,14,add_to_cart,homepage_featured
+2026-02-24T07:43:56.597584,sess_y3qe8x6jjw,14,view,homepage_featured
