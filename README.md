@@ -1,5 +1,5 @@
 # LOTUS: Full-Stack E-Commerce Platform & ML Recommendation System
-Full-stack ML system with production deployment and MLOps practices.
+Full-stack e-commerce platform featuring a custom dual-model recommendation engine and parallel CI/CD deployment pipelines.
 
 ## 🔗 Links
 **Live Demo:** [Insert Vercel URL] | **GitHub:** [Insert GitHub URL]
@@ -13,13 +13,13 @@ Full-stack ML system with production deployment and MLOps practices.
 - **UI:** Next.js 14, React Server Components, Tailwind CSS
 - **Database:** Supabase PostgreSQL
 - **Caching:** Upstash Redis (frontend), Pandas in-memory (ML backend)
-- **DevOps:** Docker, GitHub Actions CI/CD with automated testing
+- **DevOps:** Parallel GitHub Actions CI/CD (Frontend & ML Backend), automated testing (pytest), linting, and security auditing.
 
 ### ML Backend (Python FastAPI)
 - **Collaborative Filtering:** Mean-centered Truncated SVD
 - **Content-Based Filtering:** TF-IDF + Cosine Similarity (cold-start fallback)
-- **A/B Router:** Model experimentation infrastructure
-- **Data Pipeline:** Event tracking (views, wishlists, cart additions)
+- **A/B Router:** Probabilistic model selection and experimentation infrastructure
+- **Data Pipeline:** Stateful event tracking (views, wishlists, cart additions)
 
 ## Technical Challenge: Sparse Matrix Problem
 **Problem:** Standard collaborative filtering fails on highly sparse data.
