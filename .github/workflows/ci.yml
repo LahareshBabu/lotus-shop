@@ -1,4 +1,4 @@
-name: LOTUS CI/CD Enterprise Pipeline
+name: LOTUS CI/CD Pipeline
 
 on:
   push:
@@ -57,11 +57,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Execute Python Linter (Code Quality)
+    - name: Execute Python Linter
       run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
       continue-on-error: true
 
-    - name: Execute Security Vulnerability Scan
+    - name: Execute Security Scan
       run: safety check --json
       continue-on-error: true
 
@@ -69,4 +69,4 @@ jobs:
       env:
         SUPABASE_URL: "https://dummy-url.supabase.co"
         SUPABASE_KEY: "dummy-key-12345"
-      run: pytest tests/ -v
+      run: pytest tests/ -v --tb=short
