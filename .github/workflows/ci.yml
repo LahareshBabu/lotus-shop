@@ -1,7 +1,6 @@
 name: LOTUS CI/CD Assembly Line
 
 # 1. WHEN SHOULD THE ROBOTS WAKE UP?
-# Every time you push code to the 'main' or 'master' branch.
 on:
   push:
     branches: [ "main", "master" ]
@@ -12,7 +11,7 @@ on:
 jobs:
   frontend-inspector:
     name: 🌐 Frontend Robot (Next.js)
-    runs-on: ubuntu-latest # The robot borrows a free Linux computer from GitHub
+    runs-on: ubuntu-latest 
 
     steps:
     - name: 📦 Grab the Code
@@ -31,7 +30,6 @@ jobs:
       run: npm test
 
     - name: 🏗️ Attempt to Build the Website
-      # If this step fails, the robot flashes a red light and stops.
       run: npm run build
 
   backend-inspector:
@@ -39,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./ml-api # Tell this robot to only look inside the Python folder
+        working-directory: ./ml-api
 
     steps:
     - name: 📦 Grab the Code
@@ -50,6 +48,8 @@ jobs:
       with:
         python-version: '3.11'
         cache: 'pip'
+        # 🚀 THE FIX: Tell the caching robot exactly where to look!
+        cache-dependency-path: 'ml-api/requirements.txt'
 
     - name: 📥 Install ML Packages
       run: |
@@ -57,5 +57,4 @@ jobs:
         pip install -r requirements.txt
 
     - name: 🧪 ML Engine Smoke Test
-      # Proves the FastAPI server can compile and boot without crashing
       run: python -c "import main; print('✅ ML API successfully loaded and ready for production!')"
