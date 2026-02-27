@@ -118,6 +118,8 @@ export default function CategoryPage() {
   const sourceId = searchParams.get('sourceId')
   const originalCat = searchParams.get('cat')
   const isFallback = searchParams.get('fallback') === 'true'
+  // 🚀 THE CATCH: Reading the passed baton!
+  const modelTag = searchParams.get('model')
 
   let title = "Collection"
   if (category === 'search' && searchQuery) {
@@ -166,7 +168,13 @@ export default function CategoryPage() {
         if (category === 'recommendations' && sourceId) {
             let finalRelatedItems: any[] = [];
             try {
-                const aiResponse = await fetch(`http://127.0.0.1:8000/api/recommend/${sourceId}`);
+                // 🚀 THE FIX: Passing the model query parameter directly to FastAPI
+                let apiUrl = `http://127.0.0.1:8000/api/recommend/${sourceId}`;
+                if (modelTag && modelTag !== 'none') {
+                    apiUrl += `?model=${modelTag}`;
+                }
+                
+                const aiResponse = await fetch(apiUrl);
                 if (aiResponse.ok) {
                     const aiData = await aiResponse.json();
                     const recommendedIds = aiData.recommendations.map((rec: any) => rec.id);
@@ -220,7 +228,7 @@ export default function CategoryPage() {
         setWishlist(storedWishlist)
     }
     init()
-  }, [category, searchQuery, sourceId, originalCat, isFallback])
+  }, [category, searchQuery, sourceId, originalCat, isFallback, modelTag]) // 🚀 Added modelTag to dependencies
 
   // 2. Filter Engine
   useEffect(() => {

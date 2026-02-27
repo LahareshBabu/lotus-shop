@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Optional
 from recommender import get_recommendations
 from collaborative import get_collaborative_recommendations
 from datetime import datetime, timezone
@@ -31,20 +32,33 @@ def read_root():
     }
 
 @app.get("/api/recommend/{item_id}")
-def get_product_recommendations(item_id: int):
+def get_product_recommendations(item_id: int, model: Optional[str] = None):
     try:
-        # 50/50 routing split
-        if random.choice([True, False]):
+        # 🚀 THE CATCH: If the frontend passed the baton, obey it strictly!
+        if model == "collaborative":
             recommendations = get_collaborative_recommendations(item_id)
             model_used = "collaborative"
-            
-            # Fallback if no history exists for the item
             if not recommendations:
                 recommendations = get_recommendations(item_id)
                 model_used = "content_fallback"
-        else:
+                
+        elif model == "content" or model == "content_fallback":
             recommendations = get_recommendations(item_id)
-            model_used = "content"
+            model_used = model
+
+        # If no model was requested (e.g., initial page load), flip the coin!
+        else:
+            if random.choice([True, False]):
+                recommendations = get_collaborative_recommendations(item_id)
+                model_used = "collaborative"
+                
+                # Fallback if no history exists for the item
+                if not recommendations:
+                    recommendations = get_recommendations(item_id)
+                    model_used = "content_fallback"
+            else:
+                recommendations = get_recommendations(item_id)
+                model_used = "content"
 
         return {
             "target_item_id": item_id, 

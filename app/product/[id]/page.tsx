@@ -298,7 +298,15 @@ export default function ProductPage() {
   if (loading) return <div className="min-h-screen bg-[#1a0505] flex items-center justify-center text-[#e5d5a3] animate-pulse font-serif">Loading royal treasure...</div>
   if (!product) return <div className="min-h-screen bg-[#1a0505] flex items-center justify-center text-[#e5d5a3] font-serif">Product not found.</div>
 
-  const getCategorySlug = () => { const params = new URLSearchParams(); params.set('sourceId', product.id); params.set('fallback', isFallback.toString()); params.set('cat', product.category); return `shop/recommendations?${params.toString()}` }
+  // 🚀 THE FIX: INJECTING THE STATE INTO THE URL
+  const getCategorySlug = () => { 
+      const params = new URLSearchParams(); 
+      params.set('sourceId', product.id); 
+      params.set('fallback', isFallback.toString()); 
+      params.set('cat', product.category); 
+      params.set('model', activeModelName); // <-- This passes the baton!
+      return `shop/recommendations?${params.toString()}` 
+  }
 
   return (
     <div className="min-h-screen bg-[#1a0505] text-[#e5d5a3] font-sans pb-20 overflow-x-hidden">
