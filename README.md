@@ -1,4 +1,4 @@
-# LOTUS: E-Commerce Recommendation System
+# LOTUS: Full-Stack E-Commerce Platform & ML Recommendation System
 Full-stack ML system with production deployment and MLOps practices.
 
 ## 🔗 Links
