@@ -5,3 +5,5 @@ pandas
 scikit-learn
 numpy
 pydantic
+python-dotenv
+google-generativeai
