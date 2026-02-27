@@ -6,6 +6,6 @@ scikit-learn
 numpy
 pydantic
 pytest==7.4.3
-httpx==0.25.2
+httpx>=0.26.0
 flake8==6.1.0
 safety==2.3.5
