@@ -69,4 +69,6 @@ jobs:
       env:
         SUPABASE_URL: "https://dummy-url.supabase.co"
         SUPABASE_KEY: "dummy-key-12345"
+        # 🚀 THE FIX: Tell Python to look in the main ml-api folder for your files!
+        PYTHONPATH: "."
       run: pytest tests/ -v --tb=short
