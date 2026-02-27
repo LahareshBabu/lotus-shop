@@ -5,5 +5,7 @@ pandas
 scikit-learn
 numpy
 pydantic
-python-dotenv
-google-generativeai
+pytest==7.4.3
+httpx==0.25.2
+flake8==6.1.0
+safety==2.3.5
