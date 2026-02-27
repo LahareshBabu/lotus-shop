@@ -1,64 +1,60 @@
-name: LOTUS CI/CD Assembly Line
+name: LOTUS CI/CD Pipeline
 
-# 1. WHEN SHOULD THE ROBOTS WAKE UP?
 on:
   push:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
 
-# 2. WHAT SHOULD THE ROBOTS DO?
 jobs:
-  frontend-inspector:
-    name: 🌐 Frontend Robot (Next.js)
+  frontend-validation:
+    name: Frontend Build & Test
     runs-on: ubuntu-latest 
 
     steps:
-    - name: 📦 Grab the Code
+    - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: 🛠️ Set up Node.js Engine
+    - name: Setup Node.js Environment
       uses: actions/setup-node@v4
       with:
         node-version: '20'
         cache: 'npm'
 
-    - name: 📥 Install All Required Packages
+    - name: Install Dependencies
       run: npm ci
 
-    - name: 🧪 Run Automated Tests
+    - name: Execute Unit Tests
       run: npm test
 
-    - name: 🏗️ Attempt to Build the Website
+    - name: Validate Production Build
       run: npm run build
 
-  backend-inspector:
-    name: 🧠 ML Backend Robot (Python)
+  backend-validation:
+    name: ML Backend Build & Test
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./ml-api
 
     steps:
-    - name: 📦 Grab the Code
+    - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: 🐍 Set up Python Engine
+    - name: Setup Python Environment
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         cache: 'pip'
-        # 🚀 THE FIX: Tell the caching robot exactly where to look!
         cache-dependency-path: 'ml-api/requirements.txt'
 
-    - name: 📥 Install ML Packages
+    - name: Install ML Dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: 🧪 ML Engine Smoke Test
-      # 🚀 THE FIX: Give the robot a "Fake ID" so it doesn't crash looking for the .env file!
+    - name: Execute API Smoke Test
       env:
         SUPABASE_URL: "https://dummy-url.supabase.co"
         SUPABASE_KEY: "dummy-key-12345"
-      run: python -c "import main; print('✅ ML API successfully loaded and ready for production!')"
+      run: python -c "import main; print('API validation successful.')"
