@@ -57,4 +57,8 @@ jobs:
         pip install -r requirements.txt
 
     - name: 🧪 ML Engine Smoke Test
+      # 🚀 THE FIX: Give the robot a "Fake ID" so it doesn't crash looking for the .env file!
+      env:
+        SUPABASE_URL: "https://dummy-url.supabase.co"
+        SUPABASE_KEY: "dummy-key-12345"
       run: python -c "import main; print('✅ ML API successfully loaded and ready for production!')"
