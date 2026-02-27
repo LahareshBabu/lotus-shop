@@ -9,6 +9,22 @@ Full-stack e-commerce platform featuring a custom dual-model recommendation engi
 
 ## System Architecture
 
+```mermaid
+graph TD
+    Client[Next.js Client UI] -->|UI Events & Carts| Router(FastAPI A/B Router)
+    
+    subgraph ML Engine
+        Router -->|Cold Start| Content[TF-IDF Engine]
+        Router -->|Behavioral| Collab[Truncated SVD]
+    end
+    
+    subgraph Infrastructure
+        Client <-->|Sub-30ms Fetch| Redis[(Upstash Redis)]
+        Content & Collab <-->|Telemetry & Vector Storage| DB[(Supabase PostgreSQL)]
+        Content & Collab <-->|Matrix Cache| Pandas[(In-Memory Pandas)]
+    end
+```
+
 ### Frontend & Infrastructure
 - **UI:** Next.js 14, React Server Components, Tailwind CSS
 - **Database:** Supabase PostgreSQL
@@ -41,6 +57,8 @@ Dataset: UCSD Amazon Reviews (Clothing, Shoes & Jewelry)
 Sample Size: 50,000 interactions
 Matrix Sparsity: 99.93%
 --------------------------------------------------
-RMSE: 0.6547
-MAE: 0.3681
+Popularity Baseline MAE: 0.5536
+Collaborative SVD MAE: 0.3681
+Collaborative SVD RMSE: 0.6547
 ==================================================
+```

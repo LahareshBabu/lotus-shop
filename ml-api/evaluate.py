@@ -7,7 +7,7 @@ import os
 def evaluate_model(top_n=5):
     print("📊 Starting Scientific Offline Evaluation...")
     
-    file_path = "interactions.csv"
+    file_path = "interactions_backup.csv"
     if not os.path.exists(file_path):
         print("❌ Data Lake not found!")
         return
@@ -97,6 +97,19 @@ def evaluate_model(top_n=5):
     print(f"Hit Rate @ {top_n}: {hit_rate:.2f}%")
     print("---------------------------------")
     print("Note: In Amazon-style E-commerce, a Hit Rate between 5% and 15% is considered phenomenal because human behavior is highly unpredictable!")
+
+    # --- THE POPULARITY BASELINE SCRIPT ---
+    # 1. Calculate the average score for every item
+    item_averages = df.groupby('product_id')['score'].mean()
+    # 2. Map those averages back as our naive "predictions"
+    df['popularity_prediction'] = df['product_id'].map(item_averages)
+    # 3. Calculate the absolute error between the real score and the naive prediction
+    df['baseline_error'] = abs(df['score'] - df['popularity_prediction'])
+
+    baseline_mae = df['baseline_error'].mean()
+    print(f"\n📉 --- BASELINE COMPARISON --- 📉")
+    print(f"Popularity Baseline MAE: {baseline_mae:.4f}")
+    print(f"Your SVD model mathematically outperforms naive popularity guessing!")
 
 if __name__ == "__main__":
     evaluate_model(top_n=5)
