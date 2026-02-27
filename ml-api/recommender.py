@@ -1,15 +1,11 @@
-import os
 import pandas as pd
-from dotenv import load_dotenv
 from supabase import create_client, Client
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-load_dotenv("../.env.local")
-url = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-key = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY")
-
-supabase: Client = create_client(url, key)
+SUPABASE_URL = "https://fwyliqsazdyprlkemavu.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3eWxpcXNhemR5cHJsa2VtYXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzOTg2MzIsImV4cCI6MjA4NTk3NDYzMn0.dXkx1pEtiZ5uwcQJgisJs14ZyUJTuz-SomMCeZv-jbE"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Global cache for in-memory speed optimization
 _cached_products_df = None
