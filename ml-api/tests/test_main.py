@@ -6,10 +6,10 @@ Tests that the API actually works, not just that it fails predictably
 import pytest
 from fastapi.testclient import TestClient
 import os
+from dotenv import load_dotenv
 
-# Set dummy environment variables
-os.environ["SUPABASE_URL"] = "https://dummy-url.supabase.co"
-os.environ["SUPABASE_KEY"] = "dummy-key-12345"
+# 🚀 THE FIX: Load the REAL environment variables from the Vault/env file
+load_dotenv()
 
 from main import app
 
@@ -66,3 +66,5 @@ def test_environment_configuration():
     """Verify environment variables are properly set"""
     assert os.getenv("SUPABASE_URL") is not None
     assert os.getenv("SUPABASE_KEY") is not None
+    # Ensure dummy variables are gone
+    assert "dummy-url" not in os.getenv("SUPABASE_URL")
