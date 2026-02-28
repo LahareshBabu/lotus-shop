@@ -67,8 +67,8 @@ jobs:
 
     - name: Execute API Unit Tests
       env:
-        SUPABASE_URL: "https://dummy-url.supabase.co"
-        SUPABASE_KEY: "dummy-key-12345"
-        # 🚀 THE FIX: Tell Python to look in the main ml-api folder for your files!
+        # 🚀 THE FIX: Tell the robot to securely fetch the real keys from the GitHub Vault!
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         PYTHONPATH: "."
       run: pytest tests/ -v --tb=short
