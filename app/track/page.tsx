@@ -5,9 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation' // 🌟 Added useRo
 import Link from 'next/link'
 
 // CONFIGURATION
-const supabaseUrl = "https://fwyliqsazdyprlkemavu.supabase.co"
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3eWxpcXNhemR5cHJsa2VtYXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzOTg2MzIsImV4cCI6MjA4NTk3NDYzMn0.dXkx1pEtiZ5uwcQJgisJs14ZyUJTuz-SomMCeZv-jbE"
-const supabase = createClient(supabaseUrl, supabaseKey)
+import { supabase } from '@/app/supabase'
 
 // ICONS
 function BoxIcon({ className="h-10 w-10" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg> }

@@ -3,9 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { redis } from '@/lib/redis';
 
 // Connect to your existing Supabase
-const supabaseUrl = "https://fwyliqsazdyprlkemavu.supabase.co"
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3eWxpcXNhemR5cHJsa2VtYXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzOTg2MzIsImV4cCI6MjA4NTk3NDYzMn0.dXkx1pEtiZ5uwcQJgisJs14ZyUJTuz-SomMCeZv-jbE"
-const supabase = createClient(supabaseUrl, supabaseKey)
+import { supabase } from '@/app/supabase'
 
 export async function GET() {
     try {

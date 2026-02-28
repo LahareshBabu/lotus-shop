@@ -7,9 +7,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 // 1. CONFIGURATION
-const supabaseUrl = "https://fwyliqsazdyprlkemavu.supabase.co"
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3eWxpcXNhemR5cHJsa2VtYXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzOTg2MzIsImV4cCI6MjA4NTk3NDYzMn0.dXkx1pEtiZ5uwcQJgisJs14ZyUJTuz-SomMCeZv-jbE"
-const supabase = createClient(supabaseUrl, supabaseKey)
+import { supabase } from '@/app/supabase'
 
 // 🌟 MEGA MENU DATA STRUCTURE
 const MEGA_MENU = [
