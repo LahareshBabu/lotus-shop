@@ -43,3 +43,8 @@ next-env.d.ts
 # Python Microservice
 venv/
 __pycache__/
+
+# Environments
+.env
+.env.local
+*.env
