@@ -1,6 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# ============================================
+# DEPENDENCIES
+# ============================================
 /node_modules
 /.pnp
 .pnp.*
@@ -10,41 +12,102 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
+# Python virtual environments
+venv/
+env/
+ENV/
+.venv/
 
-# next.js
+# ============================================
+# TESTING
+# ============================================
+/coverage
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# ============================================
+# BUILD OUTPUTS
+# ============================================
+# Next.js
 /.next/
 /out/
-
-# production
 /build
 
-# misc
-.DS_Store
-*.pem
+# Python
+dist/
+*.egg-info/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
 
-# debug
+# ============================================
+# ENVIRONMENT VARIABLES (CRITICAL SECURITY)
+# ============================================
+.env*
+!.env.example
+!.env.sample
+
+# Alternative env file patterns
+*.env
+local.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ============================================
+# SECRETS & CREDENTIALS
+# ============================================
+*.pem
+*.key
+*.cert
+*.p12
+secrets.json
+credentials.json
+
+# ============================================
+# DEPLOYMENT
+# ============================================
+.vercel
+.netlify
+
+# ============================================
+# LOGS
+# ============================================
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
 
-# env files (can opt-in for committing if needed)
-.env*
+# ============================================
+# OS & EDITOR FILES
+# ============================================
+.DS_Store
+Thumbs.db
 
-# vercel
-.vercel
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
 
-# typescript
+# ============================================
+# TYPESCRIPT
+# ============================================
 *.tsbuildinfo
 next-env.d.ts
 
-# Python Microservice
-venv/
-__pycache__/
-
-# Environments
-.env
-.env.local
-*.env
+# ============================================
+# TEMPORARY FILES
+# ============================================
+*.tmp
+*.temp
+.cache/

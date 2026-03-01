@@ -33,6 +33,12 @@ jobs:
 
     - name: Validate Production Build
       run: npm run build
+      env:
+        # 🚀 THE FIX: Inject the vault secrets so the Next.js build doesn't crash!
+        UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+        UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+        NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_KEY }}
 
   backend-validation:
     name: ML Backend Test & Security Audit
