@@ -32,13 +32,12 @@ jobs:
       run: npm test
 
     - name: Validate Production Build
-      run: npm run build
       env:
-        # 🚀 THE FIX: Inject the vault secrets so the Next.js build doesn't crash!
         UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
         UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_KEY }}
+      run: npm run build
 
   backend-validation:
     name: ML Backend Test & Security Audit
@@ -64,6 +63,9 @@ jobs:
         pip install -r requirements.txt
 
     - name: Execute Python Linter
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
       continue-on-error: true
 
@@ -73,7 +75,6 @@ jobs:
 
     - name: Execute API Unit Tests
       env:
-        # 🚀 THE FIX: Tell the robot to securely fetch the real keys from the GitHub Vault!
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         PYTHONPATH: "."
