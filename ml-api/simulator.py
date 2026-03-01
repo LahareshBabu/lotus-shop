@@ -4,10 +4,12 @@ import uuid
 from datetime import datetime, timedelta, timezone
 import requests
 import os
+from dotenv import load_dotenv
 
 # 1. YOUR SUPABASE CONFIGURATION
-SUPABASE_URL = "https://fwyliqsazdyprlkemavu.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ3eWxpcXNhemR5cHJsa2VtYXZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzOTg2MzIsImV4cCI6MjA4NTk3NDYzMn0.dXkx1pEtiZ5uwcQJgisJs14ZyUJTuz-SomMCeZv-jbE"
+load_dotenv() # This tells Python to read the .env file
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 def fetch_products():
     print("📡 Fetching real product catalog from Supabase...")
