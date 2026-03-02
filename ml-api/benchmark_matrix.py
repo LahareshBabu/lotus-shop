@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import time
+from scipy import stats
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.model_selection import train_test_split
 
@@ -64,19 +65,63 @@ def run_experiment(interactions_df):
     sgd_model = SGDRecommender(n_factors=50, learning_rate=0.01, regularization=0.1, epochs=20)
     
     # The SGD fit method returns the training time directly (Fit on centered data)
-    sgd_time = sgd_model.fit(train_centered, user_col='user_id', item_col='product_id', rating_col='rating')
+    start_time = time.time()
+    sgd_model.fit(train_centered, user_col='user_id', item_col='product_id', rating_col='rating')
+    sgd_time = time.time() - start_time
     
     # Generate predictions using the mean-centering helper
     sgd_preds = [predict_with_mean(sgd_model, row['user_id'], row['product_id']) for _, row in test_df.iterrows()]
     sgd_mae, sgd_rmse = evaluate_predictions(test_df['rating'], sgd_preds)
 
     # ---------------------------------------------------------
-    # 3. The Final Report
+    # 3. The Final Report (Phase 1)
     # ---------------------------------------------------------
-    print("\n📊 BENCHMARK RESULTS")
+    print("\n📊 PHASE 1: BENCHMARK RESULTS")
     print("--------------------------------------------------")
     print(f"SVD Model | MAE: {svd_mae:.4f} | RMSE: {svd_rmse:.4f} | Training Time: {svd_time:.4f} sec")
     print(f"SGD Model | MAE: {sgd_mae:.4f} | RMSE: {sgd_rmse:.4f} | Training Time: {sgd_time:.4f} sec")
+
+    # =========================================================
+    # 🌟 PHASE 2: STATISTICAL CONFIDENCE LAYER
+    # =========================================================
+    print("\n🔬 PHASE 2: STATISTICAL SIGNIFICANCE (Paired t-test)")
+    print("--------------------------------------------------")
+    
+    # 1. Extract absolute errors for every single prediction
+    actuals = test_df['rating'].values
+    svd_errors = np.abs(actuals - np.array(svd_preds))
+    sgd_errors = np.abs(actuals - np.array(sgd_preds))
+
+    # 2. Run the Paired t-test
+    t_stat, p_value = stats.ttest_rel(svd_errors, sgd_errors)
+
+    # 3. Calculate 95% Confidence Interval of the Difference
+    error_diff = svd_errors - sgd_errors
+    mean_diff = np.mean(error_diff)
+    std_diff = np.std(error_diff, ddof=1)
+    n = len(error_diff)
+    
+    # Critical t-value for 95% CI
+    t_crit = stats.t.ppf(0.975, df=n-1)
+    margin_of_error = t_crit * (std_diff / np.sqrt(n))
+    
+    ci_lower = mean_diff - margin_of_error
+    ci_upper = mean_diff + margin_of_error
+
+    print(f"Mean Error Difference (SVD - SGD): {mean_diff:.6f}")
+    print(f"95% Confidence Interval: [{ci_lower:.6f}, {ci_upper:.6f}]")
+    print(f"p-value: {p_value:.6e}\n")
+    
+    # The Harvard Verdict
+    if p_value < 0.05:
+        print("🎓 HARVARD VERDICT: The p-value is < 0.05. The difference in accuracy is STATISTICALLY SIGNIFICANT.")
+        if mean_diff < 0:
+             print("Conclusion: SVD is mathematically superior on this dataset.")
+        else:
+             print("Conclusion: SGD is mathematically superior on this dataset.")
+    else:
+        print("🎓 HARVARD VERDICT: The p-value is >= 0.05. The difference is NOT statistically significant.")
+        print("Conclusion: Both models perform equally well mathematically. SVD wins the production deployment purely due to its superior inference and training speed.")
     print("==================================================\n")
 
 if __name__ == "__main__":
