@@ -111,3 +111,10 @@ next-env.d.ts
 *.tmp
 *.temp
 .cache/
+
+# ============================================
+# LARGE DATASETS (PREVENT BLOB BLOAT)
+# ============================================
+*.json.gz
+*.csv
+reviews_Clothing_Shoes_and_Jewelry_5.json.gz
