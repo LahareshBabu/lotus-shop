@@ -1,10 +1,79 @@
 import os
 import pandas as pd
+import numpy as np
 from dotenv import load_dotenv
 from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics.pairwise import cosine_similarity
 from supabase import create_client, Client
 
+# =====================================================================
+# 1. THE MATH ENGINE (Separation of Concerns)
+# =====================================================================
+class SVDRecommender:
+    def __init__(self, n_components=20):
+        self.n_components = n_components
+        self.svd = TruncatedSVD(random_state=42)
+        self.user_indices = []
+        self.item_indices = []
+        self.user_factors = None
+        self.item_factors = None
+        self.similarity_matrix = None
+
+    def fit(self, df):
+        """Trains the SVD model using your exact original matrix logic."""
+        # Check if we need to apply weights (for production event data)
+        if 'score' not in df.columns and 'event_type' in df.columns:
+            event_weights = {'view': 1.0, 'wishlist': 2.0, 'add_to_cart': 3.0}
+            df['score'] = df['event_type'].map(event_weights)
+        # Or if we are running the benchmark with explicit ratings
+        elif 'rating' in df.columns and 'score' not in df.columns:
+            df['score'] = df['rating']
+
+        # Your exact original logic for building the matrix
+        interaction_matrix = df.groupby(['user_id', 'product_id'])['score'].sum().unstack(fill_value=0)
+        item_user_matrix = interaction_matrix.T
+        
+        self.user_indices = list(interaction_matrix.index)
+        self.item_indices = list(item_user_matrix.index)
+
+        n_comps = min(self.n_components, item_user_matrix.shape[1] - 1, item_user_matrix.shape[0] - 1)
+        
+        if n_comps < 1:
+            self.similarity_matrix = cosine_similarity(item_user_matrix)
+            self.item_factors = item_user_matrix.values
+            self.user_factors = interaction_matrix.values
+        else:
+            self.svd.n_components = max(1, n_comps)
+            self.item_factors = self.svd.fit_transform(item_user_matrix)
+            self.user_factors = self.svd.components_.T
+            self.similarity_matrix = cosine_similarity(self.item_factors)
+            
+        return self
+
+    def predict(self, user_id, product_id):
+        """Predicts exact interaction score (Used by Scientific Benchmarks)."""
+        if user_id not in self.user_indices or product_id not in self.item_indices:
+            return 0.0 # Cold start fallback
+            
+        u_idx = self.user_indices.index(user_id)
+        i_idx = self.item_indices.index(product_id)
+        return np.dot(self.user_factors[u_idx, :], self.item_factors[i_idx, :].T)
+
+    def get_similar_items(self, target_item_id, top_n=5):
+        """Returns similar items (Used by the Live Production API)."""
+        if target_item_id not in self.item_indices or self.similarity_matrix is None:
+            return []
+            
+        target_index = self.item_indices.index(target_item_id)
+        similarity_scores = list(enumerate(self.similarity_matrix[target_index]))
+        similarity_scores = sorted(similarity_scores, key=lambda x: x[1], reverse=True)
+        
+        return [(self.item_indices[i], float(score)) for i, score in similarity_scores[1:top_n+1]]
+
+
+# =====================================================================
+# 2. THE INFRASTRUCTURE & API LOGIC
+# =====================================================================
 # Securely load environment variables
 load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -15,9 +84,10 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Global cache for in-memory speed optimization
+# Global caches for in-memory speed optimization
 _cached_interactions_df = None
 _cached_product_dict = None
+_cached_svd_model = None
 
 def fetch_product_names():
     global _cached_product_dict
@@ -32,7 +102,7 @@ def fetch_product_names():
     return _cached_product_dict
 
 def get_collaborative_recommendations(target_item_id, top_n=5):
-    global _cached_interactions_df
+    global _cached_interactions_df, _cached_svd_model
 
     # Load data from Supabase once and cache it in RAM
     if _cached_interactions_df is None:
@@ -41,48 +111,26 @@ def get_collaborative_recommendations(target_item_id, top_n=5):
             return []
         _cached_interactions_df = pd.DataFrame(response.data)
 
-    df = _cached_interactions_df
+    # Train the SVD model once and cache the brain in RAM (Massive speed boost!)
+    if _cached_svd_model is None:
+        _cached_svd_model = SVDRecommender(n_components=20)
+        _cached_svd_model.fit(_cached_interactions_df)
 
-    event_weights = {
-        'view': 1.0,
-        'wishlist': 2.0,
-        'add_to_cart': 3.0
-    }
-    df['score'] = df['event_type'].map(event_weights)
-
-    interaction_matrix = df.groupby(['user_id', 'product_id'])['score'].sum().unstack(fill_value=0)
-
-    if target_item_id not in interaction_matrix.columns:
+    similar_items = _cached_svd_model.get_similar_items(target_item_id, top_n)
+    
+    if not similar_items:
         return []
-
-    item_user_matrix = interaction_matrix.T
-    
-    n_components = min(20, item_user_matrix.shape[1] - 1, item_user_matrix.shape[0] - 1)
-    
-    if n_components < 1:
-        similarity_matrix = cosine_similarity(item_user_matrix)
-    else:
-        svd = TruncatedSVD(n_components=n_components, random_state=42)
-        item_factors = svd.fit_transform(item_user_matrix)
-        similarity_matrix = cosine_similarity(item_factors)
-
-    item_indices = list(item_user_matrix.index)
-    target_index = item_indices.index(target_item_id)
-
-    similarity_scores = list(enumerate(similarity_matrix[target_index]))
-    similarity_scores = sorted(similarity_scores, key=lambda x: x[1], reverse=True)
 
     product_dict = fetch_product_names()
 
     recommendations = []
-    for i, score in similarity_scores[1:top_n+1]:
-        recommended_item_id = int(item_indices[i])
+    for recommended_item_id, score in similar_items:
         item_name = product_dict.get(recommended_item_id, "Unknown Product")
         
         recommendations.append({
             "id": recommended_item_id,
             "name": item_name,
-            "match_score": round(float(score) * 100, 2)
+            "match_score": round(score * 100, 2)
         })
 
     return recommendations
