@@ -11,6 +11,7 @@ Full-stack e-commerce platform featuring a custom dual-model recommendation engi
 ![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white) ![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat&logo=next.js&logoColor=white) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=flat&logo=postgresql&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white) ![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat&logo=redis&logoColor=white)
 
 ## System Architecture
+
 ```mermaid
 graph TD
     Client[Next.js Client UI] -->|UI Events & Carts| Router(FastAPI A/B Router)
@@ -41,33 +42,29 @@ graph TD
 - **A/B Router:** Probabilistic model selection and experimentation infrastructure
 - **Data Pipeline:** Stateful event tracking (views, wishlists, cart additions)
 
-## Technical Challenge: Sparse Matrix Problem
+## Technical Challenge & Optimization Tradeoff: Sparse Matrix Factorization
 
-**Problem:** Standard collaborative filtering fails on highly sparse data.
+**Problem:** Standard collaborative filtering fails on highly sparse data. 
+- Dataset: UCSD Amazon Reviews (Clothing, Shoes & Jewelry)
+- Sample Size: 50,000 interactions (99.93% matrix sparsity)
+- Architecture Question: Does an iterative deep learning approach (Stochastic Gradient Descent) mathematically outperform closed-form linear algebra (Truncated SVD) on extreme sparsity?
 
-- Dataset: 50,000 interactions (25,127 users × 3,262 products)
-- Matrix sparsity: 99.93%
-- Initial baseline: MAE 4.02 (naive SVD predictions collapsed toward zero)
+**Solution & Benchmark:** Implemented an L2-Regularized SGD model alongside the baseline Truncated SVD model. Both were standardized with statistical mean-centering to prevent predictions from collapsing toward zero. Conducted a rigorous paired t-test on absolute prediction errors to evaluate the tradeoff between statistical accuracy and computational latency.
 
-**Solution:** Mean-centering preprocessing before matrix factorization.
-
-1. Center ratings around each user's average
-2. Train SVD on centered values
-3. Add user means back to predictions
-
-**Result:** MAE 0.3681
-```text
-📊 EVALUATION METRICS
+**Result:** ```text
+📊 SCIENTIFIC BENCHMARK RESULTS (Mean-Centered)
 ==================================================
-Dataset: UCSD Amazon Reviews (Clothing, Shoes & Jewelry)
-Sample Size: 50,000 interactions
-Matrix Sparsity: 99.93%
+SVD Model | MAE: 0.8774 | RMSE: 1.2521 | Training Time: ~17.5 sec
+SGD Model | MAE: 0.8778 | RMSE: 1.2521 | Training Time:  ~9.7 sec
 --------------------------------------------------
-Popularity Baseline MAE: 0.5536
-Collaborative SVD MAE: 0.3681
-Collaborative SVD RMSE: 0.6547
+🔬 STATISTICAL SIGNIFICANCE (Paired t-test)
+Mean Error Difference (SVD - SGD): -0.000418
+95% Confidence Interval: [-0.000471, -0.000366]
+p-value: 1.91e-54
 ==================================================
 ```
+
+**Architectural Verdict:** While the paired t-test confirmed SVD's mathematical superiority is statistically significant, the absolute MAE improvement of 0.0004 is practically negligible for user-facing recommendations (less than a 0.01% relative error reduction on a 5-star scale). Conversely, the computational tradeoff is severe: SVD required nearly 2x the training latency of SGD. This empirical evaluation demonstrates that marginal statistical improvements must be weighed against computational cost. Given the negligible practical gain relative to increased latency, escalating to deeper neural architectures (NCF) was rejected in favor of a pragmatic, latency-optimized production deployment.
 
 ## Local Development Setup
 
@@ -82,7 +79,7 @@ Collaborative SVD RMSE: 0.6547
 
 **1. Clone the repository**
 ```bash
-git clone https://github.com/yourusername/lotus-shop
+git clone [https://github.com/yourusername/lotus-shop](https://github.com/yourusername/lotus-shop)
 cd lotus-shop
 ```
 
@@ -160,7 +157,7 @@ Automated testing and deployment via GitHub Actions:
 - Deployment to Railway
 
 ## Project Structure
-```
+```text
 lotus-shop/
 ├── app/                    # Next.js pages and components
 ├── lib/                    # Utility functions

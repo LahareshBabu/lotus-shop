@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
-import { useParams, useRouter, useSearchParams } from 'next/navigation' // 🚀 IMPORTED useSearchParams
+import { useParams, useRouter, useSearchParams } from 'next/navigation' 
 import Script from 'next/script'
 
 // CONFIGURATION
@@ -51,14 +51,12 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, rec
           setTimeout(() => setIsGlittering(false), 700); 
       }
       onToggleWishlist(product);
-      // 🚀 FIX 1: Splitting Wishlist State Telemetry
       trackInteraction(isWishlisted ? 'remove_from_wishlist' : 'add_to_wishlist');
   }
 
   return (
     <article className="shrink-0 w-full sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-4.5rem)/4)] snap-start group relative flex flex-col overflow-hidden bg-[#2a0808] border border-[#e5d5a3]/20 transition-all duration-300 hover:border-[#e5d5a3]/60 hover:shadow-2xl rounded">
       <div className="relative aspect-[3/4] overflow-hidden bg-[#1a0505] flex items-center justify-center rounded-t group cursor-pointer">
-        {/* 🚀 FIX 2: Appending ?ref= to pass attribution to the next page */}
         <Link href={`/product/${product.id}?ref=${recommendationModel}`} className="absolute inset-0 z-0" onClick={() => trackInteraction('view')}>
             {product.image_url ? 
                 <img src={product.image_url} alt={product.name} onLoad={() => setImgLoaded(true)} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-110 ${imgLoaded ? 'image-loaded' : 'image-loading'}`} /> 
@@ -89,7 +87,6 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, rec
         </div>
       </div>
       <div className="flex flex-1 flex-col gap-2 p-4 bg-[#2a0808]">
-        {/* 🚀 FIX 2: Appending ?ref= to the text link as well */}
         <Link href={`/product/${product.id}?ref=${recommendationModel}`} className="hover:text-white transition-colors" onClick={() => trackInteraction('view')}>
             <h3 className="font-serif text-lg font-medium tracking-wide text-[#e5d5a3] line-clamp-1">{product.name}</h3>
         </Link>
@@ -103,7 +100,6 @@ export default function ProductPage() {
   const params: any = useParams()
   const router = useRouter()
   
-  // 🚀 LEAD ENGINEER ADDITION: Read the URL to find out who sent us here!
   const searchParams = useSearchParams()
   const attributionRef = searchParams.get('ref') || 'direct_navigation'
 
@@ -124,7 +120,11 @@ export default function ProductPage() {
   const [activeImage, setActiveImage] = useState<string>("")
   const [animKey, setAnimKey] = useState(0)
 
-  // 🚀 CAROUSEL LOGIC 🚀
+  // 🚀 LEAD ENGINEER STATE ADDITIONS
+  const [hasPurchased, setHasPurchased] = useState(false)
+  const [isZoomed, setIsZoomed] = useState(false)
+  const [zoomPos, setZoomPos] = useState({ x: 50, y: 50 })
+
   const carouselRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(true)
@@ -153,14 +153,67 @@ export default function ProductPage() {
       }
   }
 
+  // 🚀 MAGNIFIER LOGIC
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+      const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
+      const x = ((e.clientX - left) / width) * 100;
+      const y = ((e.clientY - top) / height) * 100;
+      setZoomPos({ x, y });
+  };
+
   useEffect(() => {
     async function fetchData() {
-      const { data: { session } } = await supabase.auth.getSession(); if (session) setUser(session.user)
+      const { data: { session } } = await supabase.auth.getSession(); 
+      let currentUser = null;
+      if (session) {
+          setUser(session.user);
+          currentUser = session.user;
+      }
+
       const { data: mainProduct } = await supabase.from('products').select('*').eq('id', params.id).single()
       setProduct(mainProduct)
 
       if (mainProduct) {
         setActiveImage(mainProduct.image_url)
+        
+        // 🚀 VERIFIED PURCHASE GATEKEEPER CHECK (SAFE PARSING)
+        if (currentUser) {
+            const { data: orders } = await supabase.from('orders').select('items').eq('user_id', currentUser.id);
+            if (orders) {
+                let purchased = false;
+                for (const order of orders) {
+                    if (!order.items) continue;
+                    
+                    let itemsArray = [];
+                    // Handle if it's already an array
+                    if (Array.isArray(order.items)) {
+                        itemsArray = order.items;
+                    } 
+                    // Handle if it was wrapped in an object like { products: [...] } or similar
+                    else if (typeof order.items === 'object') {
+                        // Extract the values if it's a dictionary-like object
+                        itemsArray = Object.values(order.items).flat();
+                    } 
+                    // Handle if it came back as a raw stringified JSON
+                    else if (typeof order.items === 'string') {
+                        try {
+                            const parsed = JSON.parse(order.items);
+                            itemsArray = Array.isArray(parsed) ? parsed : Object.values(parsed).flat();
+                        } catch (e) {
+                            console.error("JSON parsing error for items:", e);
+                            continue;
+                        }
+                    }
+
+                    // Now safely search the extracted array
+                    if (itemsArray.some((item: any) => item.id === mainProduct.id || item.id === String(mainProduct.id))) {
+                        purchased = true;
+                        break; // Stop looping once we find they bought it
+                    }
+                }
+                setHasPurchased(purchased);
+            }
+        }
         
         let finalRelatedItems: any[] = [];
         let modelUsedTag = "none";
@@ -213,7 +266,6 @@ export default function ProductPage() {
         setIsWishlisted(currentWishlist.some((item: any) => item.id === mainProduct.id))
         await fetchReviews(mainProduct.id)
         
-        // 🚀 FIX 3: Track main page view with accurate Attribution Ref
         let sessionId = localStorage.getItem("lotus_session_id") || "sess_" + Math.random().toString(36).substring(2, 15);
         localStorage.setItem("lotus_session_id", sessionId);
         fetch("http://127.0.0.1:8000/api/track", {
@@ -268,7 +320,6 @@ export default function ProductPage() {
     let newCart; if (existingIndex > -1) { newCart = [...existing]; newCart[existingIndex].quantity = (newCart[existingIndex].quantity || 1) + 1 } else { newCart = [...existing, { ...itemToAdd, quantity: 1 }] }
     localStorage.setItem('cart', JSON.stringify(newCart)); if (itemToAdd.id === product.id) { setAddedToCart(true); setTimeout(() => setAddedToCart(false), 2000) }
     
-    // 🚀 FIX 4: Credit the AI if they click the Main Page Cart Button!
     if (itemToAdd.id === product.id) {
         let sessionId = localStorage.getItem("lotus_session_id") || "unknown";
         fetch("http://127.0.0.1:8000/api/track", {
@@ -281,7 +332,6 @@ export default function ProductPage() {
   const toggleWishlist = () => { 
       const existing = JSON.parse(localStorage.getItem('wishlist') || '[]'); let updated; if (isWishlisted) { updated = existing.filter((p: any) => p.id !== product.id); setIsWishlisted(false) } else { updated = [...existing, product]; setIsWishlisted(true) } setWishlist(updated); localStorage.setItem('wishlist', JSON.stringify(updated)) 
       
-      // 🚀 FIX 5: Split the Wishlist tracking AND pass attribution
       const eventName = isWishlisted ? 'remove_from_wishlist' : 'add_to_wishlist';
       let sessionId = localStorage.getItem("lotus_session_id") || "unknown";
       fetch("http://127.0.0.1:8000/api/track", {
@@ -296,13 +346,12 @@ export default function ProductPage() {
   if (loading) return <div className="min-h-screen bg-[#1a0505] flex items-center justify-center text-[#e5d5a3] animate-pulse font-serif">Loading royal treasure...</div>
   if (!product) return <div className="min-h-screen bg-[#1a0505] flex items-center justify-center text-[#e5d5a3] font-serif">Product not found.</div>
 
-  // 🚀 THE FIX: INJECTING THE STATE INTO THE URL
   const getCategorySlug = () => { 
       const params = new URLSearchParams(); 
       params.set('sourceId', product.id); 
       params.set('fallback', isFallback.toString()); 
       params.set('cat', product.category); 
-      params.set('model', activeModelName); // <-- This passes the baton!
+      params.set('model', activeModelName);
       return `shop/recommendations?${params.toString()}` 
   }
 
@@ -319,9 +368,20 @@ export default function ProductPage() {
         {/* 🌟 LEFT SIDE: GALLERY 🌟 */}
         <div className="self-start sticky top-24">
             <div className="bg-[#2a0808] border border-[#e5d5a3]/20 p-2 relative shadow-2xl rounded group overflow-hidden">
-                <div className="aspect-[3/4] bg-[#1a0505] flex items-center justify-center overflow-hidden relative rounded-sm">
+                {/* 🚀 MAGNIFIER UI UPDATED */}
+                <div 
+                    className="aspect-[3/4] bg-[#1a0505] flex items-center justify-center overflow-hidden relative rounded-sm cursor-zoom-in"
+                    onMouseEnter={() => setIsZoomed(true)}
+                    onMouseLeave={() => setIsZoomed(false)}
+                    onMouseMove={handleMouseMove}
+                >
                     {activeImage ? 
-                        <img key={animKey} src={activeImage} className="w-full h-full object-cover rounded-sm animate-fade-in" /> 
+                        <img 
+                            key={animKey} 
+                            src={activeImage} 
+                            className={`w-full h-full object-cover rounded-sm transition-transform ${isZoomed ? 'duration-0 scale-[2.5]' : 'duration-500 animate-fade-in'}`}
+                            style={isZoomed ? { transformOrigin: `${zoomPos.x}% ${zoomPos.y}%` } : { transformOrigin: 'center center' }}
+                        /> 
                     : <span className="text-[#e5d5a3]/30 tracking-widest">IMAGE</span>}
                 </div>
                 <button onClick={toggleWishlist} className={`md:hidden absolute top-4 right-4 h-10 w-10 bg-[#1a0505]/80 backdrop-blur rounded-full flex items-center justify-center border transition-colors z-10 ${isWishlisted ? 'border-[#c5a059] text-red-600' : 'border-[#e5d5a3]/30 text-[#e5d5a3]'}`}><HeartIcon filled={isWishlisted} className="h-5 w-5" /></button>
@@ -403,13 +463,44 @@ export default function ProductPage() {
       <div className="max-w-7xl mx-auto px-4 md:px-12 pt-8 border-t border-[#e5d5a3]/10">
         <h2 className="font-serif text-2xl text-[#f4e4bc] mb-8">Customer Reviews</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+            
+            {/* 🚀 VERIFIED PURCHASE GATEKEEPER UI */}
             <div className="bg-[#2a0808]/50 p-6 border border-[#e5d5a3]/10 rounded h-fit">
                 <h3 className="text-[#f4e4bc] font-bold mb-4">Write a Review</h3>
-                {user ? (<form onSubmit={handleSubmitReview} className="space-y-4"><div><label className="text-xs text-[#e5d5a3]/50 uppercase tracking-wider mb-2 block">Rating</label><StarRatingInput rating={reviewForm.rating} setRating={(r) => setReviewForm({...reviewForm, rating: r})} /></div><div><label className="text-xs text-[#e5d5a3]/50 uppercase tracking-wider mb-2 block">Comment</label><textarea rows={3} required placeholder="Share your thoughts..." value={reviewForm.comment} onChange={(e) => setReviewForm({...reviewForm, comment: e.target.value})} className="w-full bg-[#1a0505] border border-[#e5d5a3]/20 p-3 text-[#e5d5a3] outline-none focus:border-[#c5a059] rounded text-sm resize-none"></textarea></div><button disabled={submitting} className="w-full bg-[#c5a059] text-[#1a0505] py-3 text-xs font-bold uppercase tracking-widest hover:bg-[#e5d5a3] rounded disabled:opacity-50">{submitting ? "Submitting..." : "Submit Review"}</button></form>) : (<div className="text-center py-6"><p className="text-[#e5d5a3]/60 text-sm mb-4">Please log in to share your experience.</p><div className="inline-block px-4 py-2 border border-[#e5d5a3]/30 text-[#e5d5a3] text-xs font-bold uppercase tracking-widest rounded opacity-50">Login Required</div></div>)}
+                
+                {user ? (
+                    hasPurchased ? (
+                        <form onSubmit={handleSubmitReview} className="space-y-4"><div><label className="text-xs text-[#e5d5a3]/50 uppercase tracking-wider mb-2 block">Rating</label><StarRatingInput rating={reviewForm.rating} setRating={(r) => setReviewForm({...reviewForm, rating: r})} /></div><div><label className="text-xs text-[#e5d5a3]/50 uppercase tracking-wider mb-2 block">Comment</label><textarea rows={3} required placeholder="Share your thoughts..." value={reviewForm.comment} onChange={(e) => setReviewForm({...reviewForm, comment: e.target.value})} className="w-full bg-[#1a0505] border border-[#e5d5a3]/20 p-3 text-[#e5d5a3] outline-none focus:border-[#c5a059] rounded text-sm resize-none"></textarea></div><button disabled={submitting} className="w-full bg-[#c5a059] text-[#1a0505] py-3 text-xs font-bold uppercase tracking-widest hover:bg-[#e5d5a3] rounded disabled:opacity-50">{submitting ? "Submitting..." : "Submit Review"}</button></form>
+                    ) : (
+                        <div className="text-center py-6 bg-[#1a0505] rounded border border-[#e5d5a3]/10">
+                            <span className="text-2xl mb-2 block">🛍️</span>
+                            <p className="text-[#e5d5a3]/80 text-sm mb-2 font-bold uppercase tracking-widest">Verified Purchases Only</p>
+                            <p className="text-[#e5d5a3]/50 text-xs px-4">You must purchase this item to write a review. This ensures all our reviews come from genuine customers.</p>
+                        </div>
+                    )
+                ) : (
+                    <div className="text-center py-6">
+                        <p className="text-[#e5d5a3]/60 text-sm mb-4">Please log in to share your experience.</p>
+                        <div className="inline-block px-4 py-2 border border-[#e5d5a3]/30 text-[#e5d5a3] text-xs font-bold uppercase tracking-widest rounded opacity-50">Login Required</div>
+                    </div>
+                )}
             </div>
+
             <div className="space-y-6">
                 {reviews.length === 0 ? <p className="text-[#e5d5a3]/40 italic text-sm">No reviews yet.</p> : reviews.map((review) => (
-                        <div key={review.id} className="bg-[#2a0808]/30 p-6 border border-[#e5d5a3]/10 rounded"><div className="flex items-center gap-2 mb-2"><div className="h-8 w-8 rounded-full bg-[#e5d5a3] text-[#1a0505] flex items-center justify-center font-bold text-xs uppercase">{review.user_email ? review.user_email.charAt(0) : 'U'}</div><span className="text-[#f4e4bc] font-bold text-sm">{review.user_email ? review.user_email.split('@')[0] : 'Customer'}</span></div><div className="flex gap-2 items-center mb-2"><StarRatingDisplay rating={review.rating} /></div><p className="text-[#e5d5a3]/50 text-xs mb-4">Reviewed on {new Date(review.created_at).toLocaleDateString()}</p><p className="text-[#e5d5a3]/80 text-sm leading-relaxed">{review.comment}</p></div>
+                        <div key={review.id} className="bg-[#2a0808]/30 p-6 border border-[#e5d5a3]/10 rounded">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                    <div className="h-8 w-8 rounded-full bg-[#e5d5a3] text-[#1a0505] flex items-center justify-center font-bold text-xs uppercase">{review.user_email ? review.user_email.charAt(0) : 'U'}</div>
+                                    <span className="text-[#f4e4bc] font-bold text-sm">{review.user_email ? review.user_email.split('@')[0] : 'Customer'}</span>
+                                </div>
+                                {/* 🚀 VERIFIED BADGE */}
+                                <span className="text-green-500/80 text-[10px] uppercase tracking-widest flex items-center gap-1 border border-green-500/20 px-2 py-0.5 rounded-full"><CheckIcon className="h-3 w-3" /> Verified</span>
+                            </div>
+                            <div className="flex gap-2 items-center mb-2"><StarRatingDisplay rating={review.rating} /></div>
+                            <p className="text-[#e5d5a3]/50 text-xs mb-4">Reviewed on {new Date(review.created_at).toLocaleDateString()}</p>
+                            <p className="text-[#e5d5a3]/80 text-sm leading-relaxed">{review.comment}</p>
+                        </div>
                     ))}
             </div>
         </div>
