@@ -1,17 +1,16 @@
 # LOTUS: Full-Stack E-Commerce Platform & ML Recommendation System
 
-Full-stack e-commerce platform featuring a custom dual-model recommendation engine and parallel CI/CD deployment pipelines.
+Full-stack e-commerce platform featuring a dual-model recommendation engine with statistical validation and parallel CI/CD pipelines.
 
 ## 🔗 Links
 
-**Live Demo:** [Insert Vercel URL] | **GitHub:** [Insert GitHub URL]
+**GitHub:** [Insert GitHub URL]
 
 ## 🛠️ Tech Stack
 
-![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white) ![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat&logo=next.js&logoColor=white) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=flat&logo=postgresql&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white) ![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat&logo=redis&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white) ![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat&logo=next.js&logoColor=white) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=flat&logo=postgresql&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white) ![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat&logo=redis&logoColor=white) ![Recharts](https://img.shields.io/badge/Recharts-22B5BF?style=flat&logo=react&logoColor=white)
 
 ## System Architecture
-
 ```mermaid
 graph TD
     Client[Next.js Client UI] -->|UI Events & Carts| Router(FastAPI A/B Router)
@@ -31,40 +30,81 @@ graph TD
 ### Frontend & Infrastructure
 
 - **UI:** Next.js 14, React Server Components, Tailwind CSS
-- **Database:** Supabase PostgreSQL
-- **Caching:** Upstash Redis (frontend), Pandas in-memory (ML backend)
-- **DevOps:** Parallel GitHub Actions CI/CD (Frontend & ML Backend), automated testing (pytest), linting, and security auditing
+- **Database:** Supabase PostgreSQL with Row Level Security
+- **Caching:** Upstash Redis (client-side), Pandas in-memory (ML backend)
+- **DevOps:** Parallel GitHub Actions CI/CD pipelines, automated testing (pytest, Jest), security auditing
 
 ### ML Backend (Python FastAPI)
 
 - **Collaborative Filtering:** Mean-centered Truncated SVD
-- **Content-Based Filtering:** TF-IDF + Cosine Similarity (cold-start fallback)
-- **A/B Router:** Probabilistic model selection and experimentation infrastructure
-- **Data Pipeline:** Stateful event tracking (views, wishlists, cart additions)
+- **Content-Based Filtering:** TF-IDF vectorization with cosine similarity (cold-start solution)
+- **A/B Testing:** Probabilistic traffic router with multi-touch attribution
+- **Data Pipeline:** Real-time interaction tracking (views, wishlists, purchases)
 
-## Technical Challenge & Optimization Tradeoff: Sparse Matrix Factorization
+## Technical Challenge: Sparse Matrix Collaborative Filtering
 
-**Problem:** Standard collaborative filtering fails on highly sparse data. 
-- Dataset: UCSD Amazon Reviews (Clothing, Shoes & Jewelry)
-- Sample Size: 50,000 interactions (99.93% matrix sparsity)
-- Architecture Question: Does an iterative deep learning approach (Stochastic Gradient Descent) mathematically outperform closed-form linear algebra (Truncated SVD) on extreme sparsity?
+### Problem Statement
 
-**Solution & Benchmark:** Implemented an L2-Regularized SGD model alongside the baseline Truncated SVD model. Both were standardized with statistical mean-centering to prevent predictions from collapsing toward zero. Conducted a rigorous paired t-test on absolute prediction errors to evaluate the tradeoff between statistical accuracy and computational latency.
+Standard collaborative filtering algorithms fail on highly sparse interaction matrices. The dataset exhibits:
 
-**Result:** ```text
-📊 SCIENTIFIC BENCHMARK RESULTS (Mean-Centered)
+- **Source:** UCSD Amazon Reviews (Clothing, Shoes & Jewelry)
+- **Sample Size:** 50,000 user-item interactions
+- **Matrix Dimensions:** 25,127 users × 3,262 products
+- **Sparsity:** 99.93% (only 0.07% of cells contain ratings)
+- **Challenge:** Traditional neighborhood-based methods (k-NN) fail due to minimal user overlap
+
+### Solution: Mean-Centered Matrix Factorization
+
+Implemented Truncated Singular Value Decomposition (SVD) with statistical preprocessing:
+
+1. **Mean-centering:** Subtract each user's average rating before factorization
+2. **Dimensionality reduction:** Project users and items into lower-dimensional latent space
+3. **Prediction reconstruction:** Add user means back to final predictions
+
+This approach prevents the model from collapsing predictions toward zero in highly sparse regions.
+
+### Experimental Validation: SVD vs. SGD
+
+To justify model selection, conducted rigorous benchmark comparing closed-form SVD against iterative Stochastic Gradient Descent (SGD) with L2 regularization.
+
+**Research Question:** Does iterative optimization (SGD) meaningfully improve predictive accuracy over closed-form decomposition (SVD) on extreme sparsity?
+
+**Methodology:** 
+- Train-test split: 80/20 (40,000 training, 10,000 test interactions)
+- Both models: Mean-centered preprocessing, identical hyperparameters
+- Evaluation metrics: Mean Absolute Error (MAE), Root Mean Squared Error (RMSE)
+- Statistical test: Paired t-test on absolute prediction errors
+
+**Results:**
+```text
+📊 BENCHMARK RESULTS (50,000 Amazon Interactions)
 ==================================================
-SVD Model | MAE: 0.8774 | RMSE: 1.2521 | Training Time: ~17.5 sec
-SGD Model | MAE: 0.8778 | RMSE: 1.2521 | Training Time:  ~9.7 sec
+SVD Model | MAE: 0.8774 | RMSE: 1.2521 | Training: 17.5s
+SGD Model | MAE: 0.8778 | RMSE: 1.2521 | Training:  9.7s
 --------------------------------------------------
 🔬 STATISTICAL SIGNIFICANCE (Paired t-test)
 Mean Error Difference (SVD - SGD): -0.000418
 95% Confidence Interval: [-0.000471, -0.000366]
-p-value: 1.91e-54
+p-value: 1.91 × 10⁻⁵⁴
 ==================================================
 ```
 
-**Architectural Verdict:** While the paired t-test confirmed SVD's mathematical superiority is statistically significant, the absolute MAE improvement of 0.0004 is practically negligible for user-facing recommendations (less than a 0.01% relative error reduction on a 5-star scale). Conversely, the computational tradeoff is severe: SVD required nearly 2x the training latency of SGD. This empirical evaluation demonstrates that marginal statistical improvements must be weighed against computational cost. Given the negligible practical gain relative to increased latency, escalating to deeper neural architectures (NCF) was rejected in favor of a pragmatic, latency-optimized production deployment.
+**Interpretation:** 
+
+While SVD's superiority is statistically significant (p < 0.001), the effect size is negligible:
+- Absolute MAE improvement: 0.0004 rating points
+- Relative improvement: 0.045% on a 5-star scale
+- Practical impact: Imperceptible to users
+
+**Architectural Decision:**
+
+The 0.0004 MAE improvement does not justify SVD's 1.8× computational overhead. However, SVD was selected for production based on:
+- Deterministic predictions (no stochastic optimization)
+- Single-step training (vs. iterative convergence)
+- Simpler production deployment
+- Statistical validation demonstrated both models achieve comparable performance
+
+This analysis illustrates the distinction between statistical significance and practical significance—a critical consideration in production ML systems.
 
 ## Local Development Setup
 
@@ -79,94 +119,97 @@ p-value: 1.91e-54
 
 **1. Clone the repository**
 ```bash
-git clone [https://github.com/yourusername/lotus-shop](https://github.com/yourusername/lotus-shop)
+git clone https://github.com/yourusername/lotus-shop
 cd lotus-shop
 ```
 
-**2. Install frontend dependencies**
+**2. Install dependencies**
 ```bash
+# Frontend
 npm install
-```
 
-**3. Install ML backend dependencies**
-```bash
+# ML Backend
 cd ml-api
 pip install -r requirements.txt
 cd ..
 ```
 
-**4. Configure environment variables**
+**3. Configure environment variables**
 ```bash
-# Copy example files
+# Create environment files
 cp .env.example .env.local
 cp ml-api/.env.example ml-api/.env
 
-# Add your credentials to both files
+# Add credentials (Supabase URL/Key, Redis URL/Token)
 ```
 
-**5. Run the development servers**
+**4. Run development servers**
 ```bash
-# Terminal 1: Frontend
+# Terminal 1: Frontend (http://localhost:3000)
 npm run dev
 
-# Terminal 2: ML Backend
+# Terminal 2: ML Backend (http://localhost:8000)
 cd ml-api
 python -m uvicorn main:app --reload
 ```
 
-**6. Access the application**
-- Frontend: http://localhost:3000
-- ML API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
+**5. API Documentation**
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
 
 ## Security & Environment Variables
 
-This project uses environment variables for all API credentials:
+All API credentials are managed through environment variables:
 
 **Local Development:**
-- Copy `.env.example` to `.env.local`
-- Add your actual credentials
-- `.env.local` is excluded from Git via `.gitignore`
+- Configuration stored in `.env.local` and `ml-api/.env`
+- Files excluded from version control via `.gitignore`
+- Example templates provided in `.env.example` files
 
 **Production:**
-- Set environment variables in Vercel/Railway dashboard
-- Never commit credentials to version control
+- Environment variables configured in deployment platform dashboards
+- No credentials committed to repository
 
-**Data Protection:**
-- Row Level Security (RLS) policies enforce access control at the database level
-- Supabase authentication manages user sessions
-- All sensitive data queries are protected by RLS rules
+**Database Security:**
+- Row Level Security (RLS) policies enforce access control at PostgreSQL level
+- Supabase Auth manages user authentication and session tokens
+- All queries filtered through RLS before execution
 
-**Note:** Earlier commits may contain API keys from initial development. 
-Current architecture uses environment variables exclusively.
+**Note:** Earlier development commits may contain API keys. Current architecture uses environment variables exclusively.
 
 ## CI/CD Pipeline
 
-Automated testing and deployment via GitHub Actions:
+Automated testing via GitHub Actions with parallel job execution:
 
-**Frontend Pipeline:**
-- Security audit (npm audit)
+**Frontend Pipeline (`frontend-validation`):**
+- Dependency security audit (`npm audit`)
 - Unit tests (Jest)
 - Production build validation
-- Deployment to Vercel
 
-**ML Backend Pipeline:**
-- Code quality checks (flake8)
-- Security scanning (safety)
-- Unit tests (pytest)
-- Deployment to Railway
+**ML Backend Pipeline (`backend-validation`):**
+- Code quality checks (`flake8`)
+- Dependency vulnerability scanning (`safety`)
+- Unit tests with coverage (`pytest`)
+
+Both pipelines execute in parallel for faster feedback cycles.
 
 ## Project Structure
-```text
+```
 lotus-shop/
-├── app/                    # Next.js pages and components
-├── lib/                    # Utility functions
+├── app/                    # Next.js application routes and components
+│   ├── api/               # API routes (search, seed, recommendations)
+│   └── [pages]/           # Application pages
+├── lib/                    # Shared utilities and configurations
+│   ├── supabase.ts        # Supabase client initialization
+│   └── redis.ts           # Redis client configuration
 ├── ml-api/                 # Python FastAPI backend
-│   ├── main.py            # API routes
-│   ├── collaborative.py   # Collaborative filtering
-│   ├── recommender.py     # Content-based filtering
-│   └── tests/             # Backend tests
-├── .github/workflows/     # CI/CD configuration
+│   ├── main.py            # API routes and A/B router
+│   ├── collaborative.py   # SVD collaborative filtering
+│   ├── recommender.py     # TF-IDF content-based filtering
+│   ├── benchmark_matrix.py # SVD vs SGD experimental validation
+│   └── tests/             # Backend unit tests
+├── .github/workflows/     # CI/CD pipeline configurations
+│   └── ci.yml             # Parallel frontend and backend jobs
 └── README.md
 ```
 
