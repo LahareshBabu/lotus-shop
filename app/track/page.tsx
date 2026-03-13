@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { useSearchParams, useRouter } from 'next/navigation' // 🌟 Added useRouter
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 // CONFIGURATION
@@ -11,16 +11,15 @@ import { supabase } from '@/app/supabase'
 function BoxIcon({ className="h-10 w-10" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg> }
 
 function TrackContent() {
-  const router = useRouter() // 🌟 Smart Router
+  const router = useRouter() 
   const searchParams = useSearchParams()
   const urlOrderId = searchParams.get('id')
   
   const [loading, setLoading] = useState(!!urlOrderId)
   const [orderId, setOrderId] = useState(urlOrderId || '')
-  const [order, setOrder] = useState<any>(null)
   const [error, setError] = useState('')
   
-  // ANIMATION STATE
+  const [trackedData, setTrackedData] = useState<{ id: string, name: string, status: string } | null>(null)
   const [progressWidth, setProgressWidth] = useState(0)
 
   useEffect(() => {
@@ -36,17 +35,61 @@ function TrackContent() {
     setError('')
     setProgressWidth(0) 
     
+    let dbOrderId = idToSearch.trim().toUpperCase()
+    let itemIndex = -1
+
+    // 🌟 FORTRESS LOGIC: Decode the TRK number to find the Order ID and Item Index 🌟
+    if (dbOrderId.startsWith('TRK') && dbOrderId.length > 5) {
+        // Example: TRK177331706189300
+        const base = dbOrderId.slice(3, -2) // Extract the middle timestamp
+        const idxHex = dbOrderId.slice(-2)  // Extract the last 2 hex chars
+        
+        dbOrderId = `ORD-${base}`
+        itemIndex = parseInt(idxHex, 16)
+        
+    } else if (dbOrderId.startsWith('ORD')) {
+        setError('Please enter a specific Item Tracking ID (starts with TRK), not a general Order ID.')
+        setTrackedData(null)
+        setLoading(false)
+        return
+    } else {
+        setError('Invalid Tracking ID. It should start with TRK.')
+        setTrackedData(null)
+        setLoading(false)
+        return
+    }
+
+    // Now query Supabase with the properly reconstructed ORD- string
     const { data, error } = await supabase
       .from('orders')
       .select('*')
-      .eq('id', idToSearch.trim())
+      .eq('id', dbOrderId)
       .single()
 
     if (error || !data) {
-      setError('Order not found. Please check the ID.')
-      setOrder(null)
+      setError('Item not found. Please verify the Tracking ID.')
+      setTrackedData(null)
     } else {
-      setOrder(data)
+      
+      const products = Array.isArray(data.items?.products) ? data.items.products : (Array.isArray(data.items) ? data.items : []);
+      
+      if (isNaN(itemIndex) || itemIndex < 0 || itemIndex >= products.length) {
+          setError('Item not found in this shipment. Please verify the Tracking ID.')
+          setTrackedData(null)
+          setLoading(false)
+          return
+      }
+
+      // Fetch the strict item status
+      const item = products[itemIndex];
+      let statusToDisplay = item.status || data.status || 'Order Placed';
+      if (statusToDisplay === 'Processing') statusToDisplay = 'Order Placed';
+
+      setTrackedData({
+          id: idToSearch.trim(), 
+          name: item.name,
+          status: statusToDisplay
+      })
     }
     setLoading(false)
   }
@@ -61,18 +104,25 @@ function TrackContent() {
       return 0
   }
 
-  const currentStep = order ? getStepIndex(order.status) : 0
+  const currentStep = trackedData ? getStepIndex(trackedData.status) : 0
   const steps = ['ORDER PLACED', 'SHIPPED', 'OUT FOR DELIVERY', 'DELIVERED']
-  const displayStatus = (order?.status === 'Processing') ? 'Order Placed' : order?.status;
 
   useEffect(() => {
-    if (order) {
+    if (trackedData) {
       const timer = setTimeout(() => {
         setProgressWidth((currentStep / 3) * 100)
       }, 100)
       return () => clearTimeout(timer)
     }
-  }, [order, currentStep])
+  }, [trackedData, currentStep])
+
+  // 🌟 SMART RESET FUNCTION 🌟
+  const handleReset = () => {
+      setTrackedData(null)
+      setOrderId('')
+      setError('')
+      router.push('/track') // Clears the query parameters from the URL
+  }
 
   return (
     <div className="min-h-screen bg-[#1a0505] text-[#e5d5a3] font-sans flex items-center justify-center p-6">
@@ -81,7 +131,7 @@ function TrackContent() {
         
         {/* 🌟 SMART BACK BUTTON 🌟 */}
         <button 
-            onClick={() => router.back()} 
+            onClick={() => trackedData ? handleReset() : router.back()} 
             className="absolute top-6 left-6 text-[10px] uppercase tracking-widest text-[#e5d5a3]/50 hover:text-white flex items-center gap-1 transition-colors"
         >
             <span>←</span> BACK
@@ -91,7 +141,7 @@ function TrackContent() {
             <div className="text-[#c5a059]"><BoxIcon /></div>
         </div>
 
-        <h1 className="font-serif text-3xl text-[#f4e4bc] mb-2">Track Your Order</h1>
+        <h1 className="font-serif text-3xl text-[#f4e4bc] mb-2">Track Your Item</h1>
         
         {loading && (
             <div className="py-12 animate-pulse">
@@ -99,17 +149,17 @@ function TrackContent() {
             </div>
         )}
 
-        {!loading && !order && (
+        {!loading && !trackedData && (
             <div className="animate-fade-in">
-                <p className="text-[#e5d5a3]/50 text-xs mb-8">Enter your Order ID found in your confirmation email to locate your royal treasure.</p>
+                <p className="text-[#e5d5a3]/50 text-xs mb-8">Enter your Tracking ID to locate your specific royal treasure.</p>
                 <div className="mb-4 text-left">
-                    <label className="text-[10px] uppercase tracking-widest text-[#e5d5a3]/30 mb-2 block font-bold">ORDER ID</label>
+                    <label className="text-[10px] uppercase tracking-widest text-[#e5d5a3]/30 mb-2 block font-bold">TRACKING ID</label>
                     <div className="flex flex-col gap-4">
                         <input 
                             type="text" 
                             value={orderId}
                             onChange={(e) => setOrderId(e.target.value)}
-                            placeholder="e.g. ORD-177054..."
+                            placeholder="e.g. TRK177331706189300"
                             className="w-full bg-[#1a0505] border border-[#e5d5a3]/20 p-3 rounded text-[#c5a059] text-center font-mono text-sm outline-none focus:border-[#c5a059]"
                         />
                         {error && <p className="text-red-500 text-xs text-center bg-red-500/10 p-2 rounded border border-red-500/20">{error}</p>}
@@ -121,14 +171,15 @@ function TrackContent() {
             </div>
         )}
 
-        {!loading && order && (
+        {!loading && trackedData && (
             <div className="animate-fade-in-up mt-8">
                 <div className="mb-10 border-b border-[#e5d5a3]/10 pb-4">
-                    <p className="text-[10px] uppercase tracking-widest text-[#e5d5a3]/30 mb-1">Tracking Order</p>
-                    <p className="text-[#c5a059] font-mono text-sm tracking-wide">{order.id}</p>
+                    <p className="text-[10px] uppercase tracking-widest text-[#e5d5a3]/30 mb-1">Tracking ID</p>
+                    <p className="text-[#c5a059] font-mono text-sm tracking-wide mb-2">{trackedData.id}</p>
+                    
+                    <p className="text-[#e5d5a3]/70 text-xs font-serif italic bg-[#1a0505] inline-block px-4 py-1.5 rounded-full border border-[#e5d5a3]/10">{trackedData.name}</p>
                 </div>
 
-                {/* Progress Bar */}
                 <div className="relative mb-12 mx-4">
                     <div className="absolute left-0 right-0 top-1/2 h-1 bg-[#1a0505] -z-0 rounded-full transform -translate-y-1/2"></div>
                     
@@ -156,14 +207,15 @@ function TrackContent() {
 
                 <div className="bg-[#1a0505] p-6 rounded border border-[#e5d5a3]/10 text-center mt-8 animate-fade-in delay-1000">
                     <p className="text-[#e5d5a3]/40 text-[10px] uppercase tracking-widest mb-2">CURRENT STATUS</p>
-                    <h3 className="text-2xl font-serif text-[#10b981] mb-2">{displayStatus}</h3>
+                    <h3 className="text-2xl font-serif text-[#10b981] mb-2">{trackedData.status}</h3>
                     <p className="text-[#e5d5a3]/60 text-[10px] italic">
                         {currentStep === 3 ? "Package has been delivered." : "Estimated delivery by end of day tomorrow."}
                     </p>
                 </div>
 
-                <button onClick={() => setOrder(null)} className="mt-8 text-[10px] text-[#e5d5a3]/40 hover:text-white border-b border-transparent hover:border-[#e5d5a3]/40 transition-all">
-                    Track a different order
+                {/* 🌟 APPLIED RESET FUNCTION HERE AS WELL 🌟 */}
+                <button onClick={handleReset} className="mt-8 text-[10px] text-[#e5d5a3]/40 hover:text-white border-b border-transparent hover:border-[#e5d5a3]/40 transition-all">
+                    Track a different item
                 </button>
             </div>
         )}

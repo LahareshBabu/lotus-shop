@@ -315,7 +315,8 @@ function AdminContent() {
 
       <div className="max-w-7xl mx-auto p-8">
           
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* 🌟 FIX: Dynamic Grid Columns. Switches to 2 cols if History Mode, hiding the empty space 🌟 */}
+          <div className={`grid grid-cols-1 ${isHistoryMode ? 'lg:grid-cols-2' : 'lg:grid-cols-3'} gap-6 mb-8`}>
               
               <div className="bg-[#2a0808]/40 p-6 rounded border border-[#c5a059]/20 relative overflow-hidden shadow-lg">
                   <h3 className="font-serif text-[#f4e4bc] mb-4 text-lg border-b border-[#e5d5a3]/10 pb-2 flex justify-between items-center">
@@ -364,30 +365,33 @@ function AdminContent() {
                   )}
               </Link>
 
-              <div className="bg-[#2a0808]/40 p-6 rounded border border-emerald-500/20 relative overflow-hidden shadow-lg">
-                  <h3 className="font-serif text-[#f4e4bc] mb-4 text-lg border-b border-[#e5d5a3]/10 pb-2 flex justify-between items-center">
-                      Demand Forecast
-                  </h3>
-                  
-                  {forecastData.length === 0 ? <p className="text-[#e5d5a3]/30 text-xs">Awaiting sufficient data to forecast trends...</p> : (
-                      <div className="space-y-3">
-                          {forecastData.slice(0, 3).map((item) => (
-                              <div key={item.product_id} className="flex flex-col bg-[#1a0505] p-3 rounded border border-[#e5d5a3]/5">
-                                  <div className="flex justify-between items-center mb-1">
-                                      <p className="text-sm text-[#e5d5a3] truncate pr-2">{item.name}</p>
-                                      <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded ${item.trend === 'accelerating' ? 'bg-emerald-500/20 text-emerald-400' : item.trend === 'stable' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
-                                          {item.trend === 'accelerating' ? 'Rising' : item.trend === 'stable' ? 'Steady' : 'Slowing'}
-                                      </span>
+              {/* 🌟 FIX: Demand Forecast strictly hidden when in History Mode 🌟 */}
+              {!isHistoryMode && (
+                  <div className="bg-[#2a0808]/40 p-6 rounded border border-emerald-500/20 relative overflow-hidden shadow-lg">
+                      <h3 className="font-serif text-[#f4e4bc] mb-4 text-lg border-b border-[#e5d5a3]/10 pb-2 flex justify-between items-center">
+                          Demand Forecast
+                      </h3>
+                      
+                      {forecastData.length === 0 ? <p className="text-[#e5d5a3]/30 text-xs">Awaiting sufficient data to forecast trends...</p> : (
+                          <div className="space-y-3">
+                              {forecastData.slice(0, 3).map((item) => (
+                                  <div key={item.product_id} className="flex flex-col bg-[#1a0505] p-3 rounded border border-[#e5d5a3]/5">
+                                      <div className="flex justify-between items-center mb-1">
+                                          <p className="text-sm text-[#e5d5a3] truncate pr-2">{item.name}</p>
+                                          <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded ${item.trend === 'accelerating' ? 'bg-emerald-500/20 text-emerald-400' : item.trend === 'stable' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
+                                              {item.trend === 'accelerating' ? 'Rising' : item.trend === 'stable' ? 'Steady' : 'Slowing'}
+                                          </span>
+                                      </div>
+                                      <div className="flex justify-between text-[10px] text-[#e5d5a3]/50 mt-1">
+                                          <span>Current Wk: <strong className="text-[#e5d5a3] font-normal">{item.weekly_sales} units</strong></span>
+                                          <span>Forecast: <strong className="text-[#c5a059]">{item.forecast_next_week} units</strong></span>
+                                      </div>
                                   </div>
-                                  <div className="flex justify-between text-[10px] text-[#e5d5a3]/50 mt-1">
-                                      <span>Current Wk: <strong className="text-[#e5d5a3] font-normal">{item.weekly_sales} units</strong></span>
-                                      <span>Forecast: <strong className="text-[#c5a059]">{item.forecast_next_week} units</strong></span>
-                                  </div>
-                              </div>
-                          ))}
-                      </div>
-                  )}
-              </div>
+                              ))}
+                          </div>
+                      )}
+                  </div>
+              )}
 
           </div>
 

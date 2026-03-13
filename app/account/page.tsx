@@ -96,10 +96,6 @@ export default function AccountPage() {
       setAddresses(addresses.filter(a => a.id !== id)) 
   }
 
-  const handleDeleteOrder = async (id: string) => {
-      // Logic handled by modal
-  }
-
   const requestDeleteOrder = (id: string) => {
       setOrderToDelete(id)
   }
@@ -233,70 +229,98 @@ export default function AccountPage() {
           </div>
         )}
 
-        {/* ─── ORDERS TAB (FIXED STATUS TEXT) ─── */}
+        {/* ─── ORDERS TAB ─── */}
         {activeTab === 'orders' && (
           <div>
             <button onClick={goBackToDashboard} className="mb-6 text-xs text-[#c5a059] hover:underline uppercase tracking-widest font-bold">← Back to Account</button>
-            <h2 className="font-serif text-2xl text-[#f4e4bc] mb-6">Your Orders</h2>
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="font-serif text-2xl text-[#f4e4bc]">Your Orders</h2>
+            </div>
+            
             {orders.length === 0 ? (
               <div className="p-8 border border-dashed border-[#e5d5a3]/20 rounded text-center text-[#e5d5a3]/40 italic">You haven't placed any orders yet.</div>
             ) : (
-              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="space-y-8 max-h-[700px] overflow-y-auto pr-2 custom-scrollbar">
+                
                 {orders.map(order => {
-                  const firstItem = Array.isArray(order.items) ? order.items[0] : (order.items?.products?.[0] || {});
-                  const isDelivered = (order.status || '').toLowerCase().includes('delivered');
-                  
-                  // 🌟 FIX: Map "Processing" -> "ORDER PLACED" 🌟
-                  const displayStatus = (order.status === 'Processing') ? 'ORDER PLACED' : order.status;
+                  const products = Array.isArray(order.items?.products) ? order.items.products : (Array.isArray(order.items) ? order.items : []);
+                  const isFullyDelivered = order.status === 'Delivered';
 
                   return (
-                    <div key={order.id} className="bg-[#2a0808] p-6 rounded border border-[#e5d5a3]/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 hover:border-[#e5d5a3]/30 transition-colors relative">
-                      
-                      {isDelivered && (
-                          <button 
-                            onClick={() => requestDeleteOrder(order.id)} 
-                            className="absolute top-4 right-4 text-[#e5d5a3]/20 hover:text-red-500 transition-colors z-10"
-                            title="Remove from history"
-                          >
-                              <TrashIcon />
-                          </button>
-                      )}
+                      <div key={order.id} className="bg-[#2a0808] p-6 rounded border border-[#e5d5a3]/20 shadow-lg relative">
+                          
+                          {/* Order Header - completely stripped of generic Order ID text */}
+                          <div className="flex justify-between items-start border-b border-[#e5d5a3]/10 pb-4 mb-6">
+                              <div>
+                                  <p className="text-[#e5d5a3]/50 text-xs uppercase tracking-widest mb-1">Purchased On</p>
+                                  <p className="text-[#e5d5a3] font-bold text-sm">{new Date(order.created_at).toDateString()}</p>
+                              </div>
+                              <div>
+                                  <p className="text-[#e5d5a3]/50 text-xs uppercase tracking-widest mb-1">Receipt Total</p>
+                                  <p className="text-[#c5a059] font-bold text-sm font-mono">₹{order.total.toLocaleString("en-IN")}</p>
+                              </div>
+                              <div className="text-right">
+                                  {isFullyDelivered && (
+                                      <button 
+                                          onClick={() => requestDeleteOrder(order.id)} 
+                                          className="text-red-500 hover:text-white hover:bg-red-500 p-2 rounded transition-colors border border-red-500/20 text-xs uppercase tracking-widest font-bold"
+                                          title="Remove entirely from history"
+                                      >
+                                          Clear History
+                                      </button>
+                                  )}
+                              </div>
+                          </div>
 
-                      <div className="flex gap-4 items-center w-full">
-                         <div className="h-20 w-20 bg-[#1a0505] rounded overflow-hidden flex-shrink-0 border border-[#e5d5a3]/10">
-                            {firstItem?.image_url ? <img src={firstItem.image_url} className="h-full w-full object-cover" /> : <div className="h-full w-full flex items-center justify-center text-[10px] text-[#e5d5a3]/30">NO IMAGE</div>}
-                         </div>
-                         <div className="flex-1">
-                            <h4 className="text-[#f4e4bc] font-serif text-lg leading-tight mb-1">{firstItem?.name || "Royal Treasure"}</h4>
-                            <p className="text-[#e5d5a3]/50 text-xs mb-2">Order ID: <span className="font-mono text-[#c5a059]">{order.id}</span></p>
-                            <p className="text-[#e5d5a3]/40 text-[10px]">Ordered on {new Date(order.created_at).toDateString()}</p>
-                         </div>
-                      </div>
-                      
-                      <div className="flex flex-col items-end gap-2 w-full md:w-auto pl-20 md:pl-0">
-                        <div className="flex items-center gap-4">
-                            {isDelivered && (
-                                <button 
-                                    onClick={() => requestDeleteOrder(order.id)} 
-                                    className="border border-red-500/50 text-red-500 p-1.5 rounded hover:bg-red-500 hover:text-white transition-all"
-                                    title="Remove from history"
-                                >
-                                    <TrashIcon />
-                                </button>
-                            )}
-                            <p className="font-bold text-xl text-[#f4e4bc]">₹{order.total.toLocaleString("en-IN")}</p>
-                        </div>
+                          <div className="space-y-6">
+                              {products.map((item: any, idx: number) => {
+                                  
+                                  let itemStatus = item.status || order.status || 'Order Placed';
+                                  if (itemStatus === 'Processing') itemStatus = 'Order Placed';
+                                  const isItemDelivered = itemStatus === 'Delivered';
+                                  
+                                  // 🌟 THE FIX: Generate a professional, unique Tracking ID (e.g. TRK177331706189300) 🌟
+                                  const baseId = order.id.replace('ORD-', '');
+                                  const hexIndex = idx.toString(16).toUpperCase().padStart(2, '0');
+                                  const trackingId = `TRK${baseId}${hexIndex}`;
 
-                        {/* 🌟 USE displayStatus HERE 🌟 */}
-                        <span className={`text-[10px] bg-[#e5d5a3]/10 px-3 py-1 rounded uppercase tracking-widest font-bold mb-2 border border-[#e5d5a3]/10 ${isDelivered ? 'text-green-400 border-green-900/30 bg-green-900/10' : 'text-[#e5d5a3]'}`}>
-                            {displayStatus}
-                        </span>
-                        
-                        {!isDelivered && (
-                            <Link href={`/track?id=${order.id}`} className="bg-transparent border border-[#c5a059] text-[#c5a059] px-6 py-2 rounded font-bold uppercase text-[10px] tracking-widest hover:bg-[#c5a059] hover:text-[#1a0505] transition-all text-center whitespace-nowrap">Track Order</Link>
-                        )}
+                                  return (
+                                      <div key={idx} className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-6 border-b border-[#e5d5a3]/5 last:border-0 last:pb-0">
+                                          
+                                          <div className="flex gap-4 items-center w-full md:w-2/3">
+                                              <div className="h-20 w-20 bg-[#1a0505] rounded overflow-hidden flex-shrink-0 border border-[#e5d5a3]/10">
+                                                  {item.image_url ? <img src={item.image_url} className="h-full w-full object-cover" /> : <div className="h-full w-full flex items-center justify-center text-[8px] text-[#e5d5a3]/30">NO IMAGE</div>}
+                                              </div>
+                                              <div className="flex-1">
+                                                  <h4 className="text-[#f4e4bc] font-serif text-lg leading-tight mb-1">{item.name}</h4>
+                                                  
+                                                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mb-2">
+                                                    <p className="text-[#e5d5a3]/50 text-xs">Qty: {item.quantity || 1}</p>
+                                                    <p className="text-[#e5d5a3]/50 text-xs">Tracking ID: <span className="font-mono text-[#c5a059]">{trackingId}</span></p>
+                                                  </div>
+                                                  
+                                                  <span className={`inline-block text-[9px] px-2 py-1 rounded uppercase tracking-widest font-bold border ${isItemDelivered ? 'text-green-400 border-green-900/30 bg-green-900/10' : 'text-[#c5a059] border-[#c5a059]/30 bg-[#c5a059]/10'}`}>
+                                                      {itemStatus}
+                                                  </span>
+                                              </div>
+                                          </div>
+                                          
+                                          <div className="flex flex-col items-end gap-3 w-full md:w-1/3">
+                                              <p className="font-bold text-lg text-[#f4e4bc]">₹{(item.price || 0).toLocaleString("en-IN")}</p>
+                                              
+                                              {!isItemDelivered && (
+                                                  <Link href={`/track?id=${trackingId}`} className="bg-transparent border border-[#c5a059] text-[#c5a059] px-6 py-2 rounded font-bold uppercase text-[10px] tracking-widest hover:bg-[#c5a059] hover:text-[#1a0505] transition-all text-center whitespace-nowrap w-full md:w-auto">
+                                                      Track Item
+                                                  </Link>
+                                              )}
+                                          </div>
+                                          
+                                      </div>
+                                  )
+                              })}
+                          </div>
+
                       </div>
-                    </div>
                   )
                 })}
               </div>
