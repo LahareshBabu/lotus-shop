@@ -107,6 +107,29 @@ function CheckoutContent() {
           
           await supabase.from('cart').delete().in('id', idsPurchased)
           
+          // =================================================================
+          // 🌟 THE FIX: OPTION A (TELEMETRY WALKIE-TALKIE)
+          // Ping the Python ML Engine so it knows what was just purchased!
+          // =================================================================
+          try {
+              await Promise.all(checkoutItems.map(item => 
+                  fetch('http://localhost:8000/api/track', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                          user_id: session.user.id,
+                          product_id: item.id,
+                          event_type: 'purchase',
+                          recommendation_model: 'none'
+                      })
+                  })
+              ));
+              console.log("Telemetry pinged successfully.");
+          } catch (telemetryError) {
+              console.error("ML Telemetry failed, but order was saved:", telemetryError);
+          }
+          // =================================================================
+          
           // 🌟 FINAL STEP: REDIRECT TO SUCCESS PAGE 🌟
           router.push('/checkout/success')
       } else {

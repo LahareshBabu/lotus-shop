@@ -1,14 +1,52 @@
 import pandas as pd
 import numpy as np
 import time
+import os
 from scipy import stats
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.model_selection import train_test_split
+from supabase import create_client, Client
+from dotenv import load_dotenv
 
 # Import your two competing models
 # Note: Ensure 'SVDRecommender' matches your actual SVD class name in collaborative.py
 from collaborative import SVDRecommender 
 from sgd_collaborative import SGDRecommender
+
+# Load environment variables for Supabase connection
+load_dotenv()
+
+def get_supabase_client() -> Client:
+    url = os.getenv("SUPABASE_URL")
+    # Updated to look for your existing SUPABASE_KEY to prevent breaking downstream files
+    key = os.getenv("SUPABASE_KEY")
+    if not url or not key:
+        return None
+    return create_client(url, key)
+
+def log_experiment_to_supabase(model_name: str, dataset_size: int, mae: float, rmse: float, training_time: float):
+    """
+    MLOps Integration: Pushes model performance metrics to the central database
+    for historical tracking and reproducible science.
+    """
+    supabase = get_supabase_client()
+    if not supabase:
+        print(f"⚠️  MLOps Warning: Supabase credentials not found. Skipping DB logging for {model_name}.")
+        return
+
+    experiment_data = {
+        "model_name": model_name,
+        "dataset_size": dataset_size,
+        "mae": float(mae),
+        "rmse": float(rmse),
+        "training_time_seconds": float(training_time)
+    }
+
+    try:
+        supabase.table("ml_experiments").insert(experiment_data).execute()
+        print(f"✅ MLOps: Successfully logged {model_name} experiment to Supabase.")
+    except Exception as e:
+        print(f"❌ MLOps Error: Failed to log experiment to Supabase: {str(e)}")
 
 def evaluate_predictions(y_true, y_pred):
     mae = mean_absolute_error(y_true, y_pred)
@@ -16,10 +54,11 @@ def evaluate_predictions(y_true, y_pred):
     return mae, rmse
 
 def run_experiment(interactions_df):
+    dataset_size = len(interactions_df)
     print("==================================================")
     print("🧪 SCIENTIFIC BENCHMARK: SVD vs. SGD (Mean-Centered)")
     print("==================================================")
-    print(f"Dataset Size: {len(interactions_df)} interactions")
+    print(f"Dataset Size: {dataset_size} interactions")
     
     # Isolate 20% of the data to test the models on unseen interactions
     train_df, test_df = train_test_split(interactions_df, test_size=0.2, random_state=42)
@@ -47,7 +86,7 @@ def run_experiment(interactions_df):
     # ---------------------------------------------------------
     # 1. Baseline: Truncated SVD (Your Original Model)
     # ---------------------------------------------------------
-    print("--> Training Baseline SVD (Centered Data)...")
+    print("\n--> Training Baseline SVD (Centered Data)...")
     svd_model = SVDRecommender(n_components=20)
     
     start_time = time.time()
@@ -58,10 +97,13 @@ def run_experiment(interactions_df):
     svd_preds = [predict_with_mean(svd_model, row['user_id'], row['product_id']) for _, row in test_df.iterrows()]
     svd_mae, svd_rmse = evaluate_predictions(test_df['rating'], svd_preds)
 
+    # MLOps Logging for SVD
+    log_experiment_to_supabase("Truncated SVD (Mean-Centered)", dataset_size, svd_mae, svd_rmse, svd_time)
+
     # ---------------------------------------------------------
     # 2. Competitor: SGD with L2 Regularization
     # ---------------------------------------------------------
-    print("--> Training SGD with L2 Regularization (Centered Data)...")
+    print("\n--> Training SGD with L2 Regularization (Centered Data)...")
     sgd_model = SGDRecommender(n_factors=50, learning_rate=0.01, regularization=0.1, epochs=20)
     
     # The SGD fit method returns the training time directly (Fit on centered data)
@@ -72,6 +114,9 @@ def run_experiment(interactions_df):
     # Generate predictions using the mean-centering helper
     sgd_preds = [predict_with_mean(sgd_model, row['user_id'], row['product_id']) for _, row in test_df.iterrows()]
     sgd_mae, sgd_rmse = evaluate_predictions(test_df['rating'], sgd_preds)
+
+    # MLOps Logging for SGD
+    log_experiment_to_supabase("SGD Matrix Factorization", dataset_size, sgd_mae, sgd_rmse, sgd_time)
 
     # ---------------------------------------------------------
     # 3. The Final Report (Phase 1)
