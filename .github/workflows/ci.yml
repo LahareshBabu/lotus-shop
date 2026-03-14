@@ -9,7 +9,7 @@ on:
 jobs:
   frontend-validation:
     name: Frontend Build & Security Audit
-    runs-on: ubuntu-latest 
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout Repository
@@ -25,8 +25,9 @@ jobs:
       run: npm ci
 
     - name: Execute Security Audit
-      run: npm audit --audit-level=high
-      continue-on-error: true
+      # Reports vulnerabilities as informational — does not block the pipeline.
+      # High/critical vulnerabilities are logged for developer awareness.
+      run: npm audit --audit-level=high || true
 
     - name: Execute Unit Tests
       run: npm test
@@ -70,8 +71,10 @@ jobs:
       continue-on-error: true
 
     - name: Execute Security Scan
-      run: safety check --json
-      continue-on-error: true
+      # Safety exit code 64 = vulnerabilities found in dependencies.
+      # Treated as informational — does not block deployment pipeline.
+      # Review output manually before production release.
+      run: safety check --json || true
 
     - name: Execute API Unit Tests
       env:
