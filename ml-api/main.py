@@ -3,9 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
-from typing import Optional, List
-from recommender import get_recommendations
+from typing import Optional, List, Any
+from recommender import get_recommendations, get_bestseller
 from collaborative import get_collaborative_recommendations
+from market_basket import get_fbt_recommendation
 from datetime import datetime, timezone, timedelta
 import os
 import random
@@ -32,6 +33,7 @@ app = FastAPI(
 
 **Core Capabilities:**
 * **Recommendation Engine:** A/B tests between Collaborative Filtering (SVD) and Content-Based (TF-IDF/SGD) algorithms.
+* **Market Basket Analysis (FBT):** Apriori algorithm with Chi-Square significance testing for 'Frequently Bought Together' upsells.
 * **Telemetry Tracking:** Captures real-time user interactions (views, purchases) to feed the ML models.
 * **Demand Forecasting:** Utilizes Weighted Time-Series Algorithms anchored to real-time purchase data to predict inventory requirements.
 """,
@@ -251,7 +253,20 @@ class RootResponse(BaseModel):
 class RecommendationResponse(BaseModel):
     target_item_id: int = Field(..., example=12)
     model_used: str = Field(..., example="collaborative")
-    recommendations: List[int] = Field(..., example=[15, 8, 22, 4, 19])
+    recommendations: List[Any] = Field(...) # 🌟 THE FIX: Allows dictionaries or integers safely
+
+# 🌟 NEW FBT SCHEMAS 🌟
+class FBTMetrics(BaseModel):
+    support: Optional[float] = Field(None, example=0.043)
+    confidence: Optional[float] = Field(None, example=0.847)
+    lift: Optional[float] = Field(None, example=2.31)
+    chi_square_p_value: Optional[float] = Field(None, example=0.003)
+
+class FBTResponse(BaseModel):
+    target_item_id: int = Field(..., example=12)
+    recommended_item_id: int = Field(..., example=15)
+    recommendation_type: str = Field(..., example="fbt_apriori")
+    metrics: Optional[FBTMetrics] = None
 
 class Interaction(BaseModel):
     user_id: str = Field(..., example="jade_jolts_01")
@@ -331,6 +346,60 @@ def get_product_recommendations(item_id: int, model: Optional[str] = None):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# 🌟 NEW FBT ENDPOINT 🌟
+@app.get("/api/fbt/{item_id}", tags=["Recommendations"], response_model=FBTResponse, summary="Get Frequently Bought Together (FBT) Item")
+def get_frequently_bought_together(item_id: int):
+    """
+    Retrieves the single mathematically strongest companion product for a given item using Market Basket Analysis.
+
+    **Enterprise Fallback Chain:**
+    1. **Apriori (FBT):** Queries the pre-computed association rules. Requires Lift > 1.0 and Chi-Square p-value < 0.05.
+    2. **Content-Based:** If no statistically significant pair exists, falls back to TF-IDF attribute similarity.
+    3. **Bestseller:** If the item is brand new, falls back to the most popular global item.
+    """
+    try:
+        # 1. Try Apriori Market Basket Analysis
+        fbt_result = get_fbt_recommendation(item_id)
+        
+        if fbt_result:
+            return {
+                "target_item_id": item_id,
+                "recommended_item_id": fbt_result["recommended_item_id"],
+                "recommendation_type": "fbt_apriori",
+                "metrics": {
+                    "support": fbt_result["support"],
+                    "confidence": fbt_result["confidence"],
+                    "lift": fbt_result["lift"],
+                    "chi_square_p_value": fbt_result["p_value"]
+                }
+            }
+        
+        # 2. Fallback to Content-Based (TF-IDF)
+        content_recs = get_recommendations(item_id)
+        if content_recs and len(content_recs) > 0:
+            return {
+                "target_item_id": item_id,
+                # 🌟 THE FIX: Strictly extract the integer ID from the dictionary
+                "recommended_item_id": int(content_recs[0]["id"]), 
+                "recommendation_type": "content_fallback",
+                "metrics": None
+            }
+        
+        # 3. Fallback to Bestseller (Safe default for absolute cold-start)
+        bestseller_id = get_bestseller()
+        
+        return {
+            "target_item_id": item_id,
+            "recommended_item_id": bestseller_id,
+            "recommendation_type": "bestseller_fallback",
+            "metrics": None
+        }
+
+    except Exception as e:
+        print(f"FBT Error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch FBT recommendation.")
+
 
 @app.post("/api/track", tags=["Telemetry"], response_model=TrackResponse, summary="Track User Interactions")
 async def track_interaction(interaction: Interaction):

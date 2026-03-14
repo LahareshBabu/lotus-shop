@@ -17,6 +17,38 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Global cache for in-memory speed optimization
 _cached_products_df = None
+_cached_bestseller_id = None  # 🌟 NEW: Caches the global bestseller for the FBT fallback chain
+
+def get_bestseller() -> int:
+    """
+    Absolute Cold-Start Fallback: Calculates the global bestseller based on historical purchases.
+    Results are cached in memory to prevent database hammering.
+    """
+    global _cached_bestseller_id
+    if _cached_bestseller_id is not None:
+        return _cached_bestseller_id
+        
+    try:
+        # Fetch purchase interactions to find the global bestseller
+        response = supabase.table("interactions").select("product_id").eq("event_type", "purchase").execute()
+        
+        if response.data:
+            df_purchases = pd.DataFrame(response.data)
+            if not df_purchases.empty:
+                top_item = df_purchases['product_id'].value_counts().idxmax()
+                _cached_bestseller_id = int(top_item)
+                return _cached_bestseller_id
+
+        # Failsafe if absolutely no purchases exist in the database yet
+        global _cached_products_df
+        if _cached_products_df is not None and not _cached_products_df.empty:
+            _cached_bestseller_id = int(_cached_products_df['id'].iloc[0])
+            return _cached_bestseller_id
+            
+        return 1 # Absolute bottom-tier fallback
+    except Exception as e:
+        print(f"Error calculating bestseller: {e}")
+        return 1
 
 def get_recommendations(target_item_id: int):
     global _cached_products_df

@@ -125,6 +125,11 @@ export default function ProductPage() {
   const [isZoomed, setIsZoomed] = useState(false)
   const [zoomPos, setZoomPos] = useState({ x: 50, y: 50 })
 
+  // 🚀 FBT MODULE STATE
+  const [fbtProduct, setFbtProduct] = useState<any>(null)
+  const [fbtLoading, setFbtLoading] = useState(false)
+  const [addedBothToCart, setAddedBothToCart] = useState(false)
+
   const carouselRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(true)
@@ -185,16 +190,12 @@ export default function ProductPage() {
                     if (!order.items) continue;
                     
                     let itemsArray = [];
-                    // Handle if it's already an array
                     if (Array.isArray(order.items)) {
                         itemsArray = order.items;
                     } 
-                    // Handle if it was wrapped in an object like { products: [...] } or similar
                     else if (typeof order.items === 'object') {
-                        // Extract the values if it's a dictionary-like object
                         itemsArray = Object.values(order.items).flat();
                     } 
-                    // Handle if it came back as a raw stringified JSON
                     else if (typeof order.items === 'string') {
                         try {
                             const parsed = JSON.parse(order.items);
@@ -205,14 +206,31 @@ export default function ProductPage() {
                         }
                     }
 
-                    // Now safely search the extracted array
                     if (itemsArray.some((item: any) => item.id === mainProduct.id || item.id === String(mainProduct.id))) {
                         purchased = true;
-                        break; // Stop looping once we find they bought it
+                        break; 
                     }
                 }
                 setHasPurchased(purchased);
             }
+        }
+
+        // 🌟 FBT ENGINE API CALL 🌟
+        setFbtLoading(true);
+        try {
+            const fbtRes = await fetch(`http://127.0.0.1:8000/api/fbt/${mainProduct.id}`);
+            if (fbtRes.ok) {
+                const fbtData = await fbtRes.json();
+                const recId = fbtData.recommended_item_id;
+                if (recId) {
+                    const { data: fbtItem } = await supabase.from('products').select('*').eq('id', recId).single();
+                    if (fbtItem) setFbtProduct(fbtItem);
+                }
+            }
+        } catch (err) {
+            console.log("FBT Engine offline or unreachable.");
+        } finally {
+            setFbtLoading(false);
         }
         
         let finalRelatedItems: any[] = [];
@@ -224,7 +242,11 @@ export default function ProductPage() {
                 const aiData = await aiResponse.json();
                 modelUsedTag = aiData.model_used;
                 
-                const recommendedIds = aiData.recommendations.map((rec: any) => rec.id);
+                // 🌟 THE BULLETPROOF FIX: Safely extract IDs whether they are objects or raw integers 🌟
+                const recommendedIds = aiData.recommendations.map((rec: any) => 
+                    typeof rec === 'object' && rec !== null ? rec.id : rec
+                ).filter((id: any) => id !== undefined && id !== null);
+
                 if (recommendedIds.length > 0) {
                     const { data: aiProducts } = await supabase
                         .from('products')
@@ -329,6 +351,41 @@ export default function ProductPage() {
     }
   }
 
+  // 🌟 ADD BOTH TO CART LOGIC 🌟
+  const handleAddBothToCart = () => {
+      if (!product || !fbtProduct) return;
+      
+      const existing = JSON.parse(localStorage.getItem('cart') || '[]');
+      let newCart = [...existing];
+
+      [product, fbtProduct].forEach(itemToAdd => {
+          const existingIndex = newCart.findIndex((i: any) => i.id === itemToAdd.id);
+          if (existingIndex > -1) {
+              newCart[existingIndex].quantity = (newCart[existingIndex].quantity || 1) + 1;
+          } else {
+              newCart.push({ ...itemToAdd, quantity: 1 });
+          }
+          
+          let sessionId = localStorage.getItem("lotus_session_id") || "unknown";
+          fetch("http://127.0.0.1:8000/api/track", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ 
+                  user_id: sessionId, 
+                  product_id: itemToAdd.id, 
+                  event_type: 'add_to_cart', 
+                  recommendation_model: 'fbt_apriori' 
+              })
+          }).catch(() => {});
+      });
+
+      localStorage.setItem('cart', JSON.stringify(newCart));
+      setAddedBothToCart(true);
+      setTimeout(() => setAddedBothToCart(false), 2000);
+      
+      // Dispatch custom event to trigger cart notification in layout
+      window.dispatchEvent(new Event("storage"));
+  }
+
   const toggleWishlist = () => { 
       const existing = JSON.parse(localStorage.getItem('wishlist') || '[]'); let updated; if (isWishlisted) { updated = existing.filter((p: any) => p.id !== product.id); setIsWishlisted(false) } else { updated = [...existing, product]; setIsWishlisted(true) } setWishlist(updated); localStorage.setItem('wishlist', JSON.stringify(updated)) 
       
@@ -416,6 +473,49 @@ export default function ProductPage() {
                     <button onClick={toggleWishlist} className={`px-6 border transition-all flex items-center justify-center rounded ${isWishlisted ? 'border-[#c5a059] text-red-600 bg-[#c5a059]/10' : 'border-[#e5d5a3]/30 text-[#e5d5a3] hover:border-[#c5a059] hover:text-[#c5a059]'}`}><HeartIcon filled={isWishlisted} className="h-6 w-6" /></button>
                 </div>
             </div>
+
+            {/* 🌟 FREQUENTLY BOUGHT TOGETHER (FBT) MODULE 🌟 */}
+            {fbtLoading && (
+                <div className="bg-[#2a0808]/50 border border-[#e5d5a3]/10 p-6 rounded mb-8 animate-pulse flex items-center justify-center h-[160px]">
+                    <span className="text-[#c5a059] text-xs uppercase tracking-widest">Analyzing Market Baskets...</span>
+                </div>
+            )}
+            
+            {!fbtLoading && fbtProduct && (
+                <div className="bg-[#1a0505] border border-[#c5a059]/30 p-5 md:p-6 rounded shadow-[0_0_20px_rgba(197,160,89,0.05)] mb-8">
+                    <h3 className="font-serif text-lg text-[#f4e4bc] mb-4 flex items-center gap-2">
+                        Frequently Bought Together
+                    </h3>
+                    
+                    <div className="flex items-center gap-3 md:gap-4 mb-6">
+                        <div className="h-16 w-16 md:h-20 md:w-20 bg-[#2a0808] rounded border border-[#e5d5a3]/20 overflow-hidden shrink-0">
+                            <img src={product.image_url} className="h-full w-full object-cover opacity-90" />
+                        </div>
+                        <div className="text-[#c5a059] font-bold text-xl md:text-2xl">+</div>
+                        <Link href={`/product/${fbtProduct.id}?ref=fbt_apriori`} className="h-16 w-16 md:h-20 md:w-20 bg-[#2a0808] rounded border border-[#e5d5a3]/20 overflow-hidden shrink-0 group block cursor-pointer">
+                            <img src={fbtProduct.image_url} className="h-full w-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all" />
+                        </Link>
+                        
+                        <div className="flex-1 pl-2 hidden sm:block">
+                            <p className="text-xs text-[#e5d5a3] font-bold mb-1 truncate">This item: {product.name}</p>
+                            <p className="text-xs text-[#e5d5a3]/60 hover:text-[#c5a059] transition-colors truncate">
+                                <Link href={`/product/${fbtProduct.id}?ref=fbt_apriori`}>{fbtProduct.name}</Link>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-t border-[#e5d5a3]/10 pt-4">
+                        <div>
+                            <p className="text-[10px] uppercase tracking-widest text-[#e5d5a3]/50 mb-1">Total Bundle Price</p>
+                            <p className="text-xl md:text-2xl font-serif text-[#c5a059]">₹{(product.price + fbtProduct.price).toLocaleString("en-IN")}</p>
+                        </div>
+                        <button onClick={handleAddBothToCart} disabled={addedBothToCart} className={`w-full sm:w-auto px-6 py-3 font-bold uppercase tracking-widest transition-all text-xs rounded flex items-center justify-center gap-2 shadow-lg ${addedBothToCart ? "bg-green-800 text-white border border-green-800" : "bg-[#c5a059]/10 border border-[#c5a059] text-[#c5a059] hover:bg-[#c5a059] hover:text-[#1a0505]"}`}>
+                            {addedBothToCart ? (<><CheckIcon className="h-4 w-4 animate-check" /> Added Both</>) : (<><ShoppingBagIcon className="h-4 w-4" /> Add Both to Cart</>)}
+                        </button>
+                    </div>
+                </div>
+            )}
+            {/* 🌟 END FBT MODULE 🌟 */}
 
             <div className="grid grid-cols-3 gap-2 text-center text-[10px] text-[#e5d5a3]/60 mb-8"><div className="bg-[#2a0808] p-3 rounded flex flex-col items-center gap-2"><span className="text-xl">✨</span><span>Premium Polish</span></div><div className="bg-[#2a0808] p-3 rounded flex flex-col items-center gap-2"><span className="text-xl">🚚</span><span>Fast Delivery</span></div><div className="bg-[#2a0808] p-3 rounded flex flex-col items-center gap-2"><span className="text-xl">🔒</span><span>Secure Pay</span></div></div>
             
