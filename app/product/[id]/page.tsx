@@ -16,6 +16,7 @@ function CheckIcon({ className = "h-5 w-5" }: { className?: string }) { return <
 function ShoppingBagIcon({ className = "h-5 w-5" }: { className?: string }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" /></svg> }
 function ChevronLeftIcon({ className = "h-6 w-6" }: { className?: string }) { return <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={className}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg> }
 function ChevronRightIcon({ className = "h-6 w-6" }: { className?: string }) { return <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={className}><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg> }
+function AlertIcon({ className = "h-5 w-5" }: { className?: string }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg> }
 
 function StarRatingDisplay({ rating }: { rating: number }) { return <div className="flex text-[#c5a059]">{[1, 2, 3, 4, 5].map((star) => (<StarIcon key={star} filled={star <= Math.round(rating)} />))}</div> }
 function StarRatingInput({ rating, setRating }: { rating: number, setRating: (r: number) => void }) { const [hover, setHover] = useState(0); return <div className="flex gap-1">{[1, 2, 3, 4, 5].map((star) => { const isFilled = star <= (hover || rating); return <button key={star} type="button" className={`focus:outline-none transition-colors duration-200 ${isFilled ? 'text-[#c5a059]' : 'text-[#e5d5a3]/30'}`} onClick={() => setRating(star)} onMouseEnter={() => setHover(star)} onMouseLeave={() => setHover(rating)}><StarIcon filled={true} className="h-6 w-6" /></button> })}</div> }
@@ -56,13 +57,24 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, rec
 
   return (
     <article className="shrink-0 w-full sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-4.5rem)/4)] snap-start group relative flex flex-col overflow-hidden bg-[#2a0808] border border-[#e5d5a3]/20 transition-all duration-300 hover:border-[#e5d5a3]/60 hover:shadow-2xl rounded">
-      <div className="relative aspect-[3/4] overflow-hidden bg-[#1a0505] flex items-center justify-center rounded-t group cursor-pointer">
+      <div className={`relative aspect-[3/4] overflow-hidden bg-[#1a0505] flex items-center justify-center rounded-t ${product.is_sold_out ? 'cursor-default' : 'group cursor-pointer'}`}>
         <Link href={`/product/${product.id}?ref=${recommendationModel}`} className="absolute inset-0 z-0" onClick={() => trackInteraction('view')}>
             {product.image_url ? 
-                <img src={product.image_url} alt={product.name} onLoad={() => setImgLoaded(true)} className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-110 ${imgLoaded ? 'image-loaded' : 'image-loading'}`} /> 
+                <img src={product.image_url} alt={product.name} onLoad={() => setImgLoaded(true)} className={`h-full w-full object-cover transition-transform duration-500 ${!product.is_sold_out ? 'group-hover:scale-110' : ''} ${imgLoaded ? 'image-loaded' : 'image-loading'} ${product.is_sold_out ? 'grayscale opacity-70' : ''}`} /> 
             : 
                 <div className="flex flex-col items-center justify-center text-[#e5d5a3]/30 h-full"><span className="font-serif text-lg tracking-widest">IMAGE</span></div>
             }
+            
+            {/* 🌟 ELITE SOLD OUT OVERLAY (CAROUSEL) 🌟 */}
+            {product.is_sold_out && (
+                <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                    <div className="w-full bg-[#1a0505]/80 border-y border-[#c5a059]/30 py-3 flex justify-center shadow-lg">
+                        <span className="text-[#c5a059] text-[10px] font-bold uppercase tracking-[0.3em] ml-[0.3em]">
+                            Sold Out
+                        </span>
+                    </div>
+                </div>
+            )}
         </Link>
         <button onClick={handleWishlistClick} className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-[#1a0505]/60 backdrop-blur-sm hover:bg-[#e5d5a3] hover:text-[#1a0505] text-[#e5d5a3] border border-[#e5d5a3]/30 z-20 transition-colors">
             {isGlittering && (
@@ -74,19 +86,25 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, rec
             )}
             <HeartIcon className={`h-4 w-4 relative z-10 ${isWishlisted ? "fill-red-600 text-red-600" : ""}`} filled={isWishlisted} />
         </button>
-        <div className="absolute inset-x-0 bottom-0 z-20 translate-y-full transition-transform duration-300 group-hover:translate-y-0">
-            <button onClick={(e) => { 
-                e.preventDefault(); 
-                onAddToCart(product); 
-                setAddedEffect(true); 
-                setTimeout(() => setAddedEffect(false), 2000);
-                trackInteraction('add_to_cart');
-            }} className={`w-full py-3 font-sans text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-300 ${addedEffect ? "bg-green-700 text-white" : "bg-[#e5d5a3] text-[#1a0505] hover:bg-white"}`}>
-                {addedEffect ? (<div className="flex items-center gap-2"><CheckIcon className="h-5 w-5 animate-check" /> <span className="animate-pulse">Added</span></div>) : (<><ShoppingBagIcon className="h-4 w-4" /> Add to Cart</>)}
-            </button>
+        <div className={`absolute inset-x-0 bottom-0 z-20 ${product.is_sold_out ? '' : 'translate-y-full group-hover:translate-y-0'} transition-transform duration-300`}>
+            {product.is_sold_out ? (
+                <div className="w-full py-3 font-sans text-[10px] font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-2 bg-[#1a0505] text-[#c5a059]/40 border-t border-[#c5a059]/20 cursor-not-allowed">
+                    Out of Stock
+                </div>
+            ) : (
+                <button onClick={(e) => { 
+                    e.preventDefault(); 
+                    onAddToCart(product); 
+                    setAddedEffect(true); 
+                    setTimeout(() => setAddedEffect(false), 2000);
+                    trackInteraction('add_to_cart');
+                }} className={`w-full py-3 font-sans text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-300 ${addedEffect ? "bg-green-700 text-white" : "bg-[#e5d5a3] text-[#1a0505] hover:bg-white"}`}>
+                    {addedEffect ? (<div className="flex items-center gap-2"><CheckIcon className="h-5 w-5 animate-check" /> <span className="animate-pulse">Added</span></div>) : (<><ShoppingBagIcon className="h-4 w-4" /> Add to Cart</>)}
+                </button>
+            )}
         </div>
       </div>
-      <div className="flex flex-1 flex-col gap-2 p-4 bg-[#2a0808]">
+      <div className={`flex flex-1 flex-col gap-2 p-4 bg-[#2a0808] ${product.is_sold_out ? 'opacity-70' : ''}`}>
         <Link href={`/product/${product.id}?ref=${recommendationModel}`} className="hover:text-white transition-colors" onClick={() => trackInteraction('view')}>
             <h3 className="font-serif text-lg font-medium tracking-wide text-[#e5d5a3] line-clamp-1">{product.name}</h3>
         </Link>
@@ -129,6 +147,8 @@ export default function ProductPage() {
   const [fbtProduct, setFbtProduct] = useState<any>(null)
   const [fbtLoading, setFbtLoading] = useState(false)
   const [addedBothToCart, setAddedBothToCart] = useState(false)
+  // New Bundle Selection State for custom toggles
+  const [bundleSelection, setBundleSelection] = useState({ main: true, fbt: true })
 
   const carouselRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
@@ -175,13 +195,14 @@ export default function ProductPage() {
           currentUser = session.user;
       }
 
+      // Fetch product including is_sold_out
       const { data: mainProduct } = await supabase.from('products').select('*').eq('id', params.id).single()
       setProduct(mainProduct)
 
       if (mainProduct) {
         setActiveImage(mainProduct.image_url)
         
-        // 🚀 VERIFIED PURCHASE GATEKEEPER CHECK (SAFE PARSING)
+        // 🚀 VERIFIED PURCHASE GATEKEEPER CHECK
         if (currentUser) {
             const { data: orders } = await supabase.from('orders').select('items').eq('user_id', currentUser.id);
             if (orders) {
@@ -224,7 +245,9 @@ export default function ProductPage() {
                 const recId = fbtData.recommended_item_id;
                 if (recId) {
                     const { data: fbtItem } = await supabase.from('products').select('*').eq('id', recId).single();
-                    if (fbtItem) setFbtProduct(fbtItem);
+                    if (fbtItem && !fbtItem.is_sold_out) { // Don't recommend sold out items as FBT
+                        setFbtProduct(fbtItem);
+                    }
                 }
             }
         } catch (err) {
@@ -242,7 +265,6 @@ export default function ProductPage() {
                 const aiData = await aiResponse.json();
                 modelUsedTag = aiData.model_used;
                 
-                // 🌟 THE BULLETPROOF FIX: Safely extract IDs whether they are objects or raw integers 🌟
                 const recommendedIds = aiData.recommendations.map((rec: any) => 
                     typeof rec === 'object' && rec !== null ? rec.id : rec
                 ).filter((id: any) => id !== undefined && id !== null);
@@ -310,6 +332,7 @@ export default function ProductPage() {
   }
 
   const handleBuyNow = () => {
+    if (product?.is_sold_out) return; // Safety check
     if (!user) return alert("Please log in to purchase.")
     setBuying(true)
     const amount = product.price * 100 
@@ -338,9 +361,13 @@ export default function ProductPage() {
   }
 
   const handleAddToCart = (itemToAdd = product) => {
+    if (itemToAdd.is_sold_out) return; // Safety check
     const existing = JSON.parse(localStorage.getItem('cart') || '[]'); const existingIndex = existing.findIndex((i: any) => i.id === itemToAdd.id)
     let newCart; if (existingIndex > -1) { newCart = [...existing]; newCart[existingIndex].quantity = (newCart[existingIndex].quantity || 1) + 1 } else { newCart = [...existing, { ...itemToAdd, quantity: 1 }] }
     localStorage.setItem('cart', JSON.stringify(newCart)); if (itemToAdd.id === product.id) { setAddedToCart(true); setTimeout(() => setAddedToCart(false), 2000) }
+    
+    // Dispatch custom event to trigger cart notification in layout
+    window.dispatchEvent(new Event("storage"));
     
     if (itemToAdd.id === product.id) {
         let sessionId = localStorage.getItem("lotus_session_id") || "unknown";
@@ -351,19 +378,23 @@ export default function ProductPage() {
     }
   }
 
-  // 🌟 ADD BOTH TO CART LOGIC 🌟
-  const handleAddBothToCart = () => {
-      if (!product || !fbtProduct) return;
+  // 🌟 NEW: DYNAMIC BUNDLE ADD TO CART LOGIC 🌟
+  const handleAddBundleToCart = () => {
+      const itemsToAdd = [];
+      if (bundleSelection.main && product && !product.is_sold_out) itemsToAdd.push(product);
+      if (bundleSelection.fbt && fbtProduct && !fbtProduct.is_sold_out) itemsToAdd.push(fbtProduct);
+
+      if (itemsToAdd.length === 0) return;
       
       const existing = JSON.parse(localStorage.getItem('cart') || '[]');
       let newCart = [...existing];
 
-      [product, fbtProduct].forEach(itemToAdd => {
-          const existingIndex = newCart.findIndex((i: any) => i.id === itemToAdd.id);
+      itemsToAdd.forEach(item => {
+          const existingIndex = newCart.findIndex((i: any) => i.id === item.id);
           if (existingIndex > -1) {
               newCart[existingIndex].quantity = (newCart[existingIndex].quantity || 1) + 1;
           } else {
-              newCart.push({ ...itemToAdd, quantity: 1 });
+              newCart.push({ ...item, quantity: 1 });
           }
           
           let sessionId = localStorage.getItem("lotus_session_id") || "unknown";
@@ -371,7 +402,7 @@ export default function ProductPage() {
               method: "POST", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ 
                   user_id: sessionId, 
-                  product_id: itemToAdd.id, 
+                  product_id: item.id, 
                   event_type: 'add_to_cart', 
                   recommendation_model: 'fbt_apriori' 
               })
@@ -379,10 +410,8 @@ export default function ProductPage() {
       });
 
       localStorage.setItem('cart', JSON.stringify(newCart));
-      setAddedBothToCart(true);
+      setAddedBothToCart(true); // Reusing this state for the button confirmation
       setTimeout(() => setAddedBothToCart(false), 2000);
-      
-      // Dispatch custom event to trigger cart notification in layout
       window.dispatchEvent(new Event("storage"));
   }
 
@@ -425,10 +454,9 @@ export default function ProductPage() {
         {/* 🌟 LEFT SIDE: GALLERY 🌟 */}
         <div className="self-start sticky top-24">
             <div className="bg-[#2a0808] border border-[#e5d5a3]/20 p-2 relative shadow-2xl rounded group overflow-hidden">
-                {/* 🚀 MAGNIFIER UI UPDATED */}
                 <div 
-                    className="aspect-[3/4] bg-[#1a0505] flex items-center justify-center overflow-hidden relative rounded-sm cursor-zoom-in"
-                    onMouseEnter={() => setIsZoomed(true)}
+                    className={`aspect-[3/4] bg-[#1a0505] flex items-center justify-center overflow-hidden relative rounded-sm ${product.is_sold_out ? 'cursor-default' : 'cursor-zoom-in'}`}
+                    onMouseEnter={() => !product.is_sold_out && setIsZoomed(true)}
                     onMouseLeave={() => setIsZoomed(false)}
                     onMouseMove={handleMouseMove}
                 >
@@ -436,12 +464,22 @@ export default function ProductPage() {
                         <img 
                             key={animKey} 
                             src={activeImage} 
-                            className={`w-full h-full object-cover rounded-sm transition-transform ${isZoomed ? 'duration-0 scale-[2.5]' : 'duration-500 animate-fade-in'}`}
+                            className={`w-full h-full object-cover rounded-sm transition-transform ${isZoomed ? 'duration-0 scale-[2.5]' : 'duration-500 animate-fade-in'} ${product.is_sold_out ? 'grayscale opacity-80' : ''}`}
                             style={isZoomed ? { transformOrigin: `${zoomPos.x}% ${zoomPos.y}%` } : { transformOrigin: 'center center' }}
                         /> 
                     : <span className="text-[#e5d5a3]/30 tracking-widest">IMAGE</span>}
+                    
+                    {/* 🌟 ELITE SOLD OUT OVERLAY (MAIN IMAGE) 🌟 */}
+                    {product.is_sold_out && (
+                        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                            <div className="w-full bg-[#1a0505]/80 border-y border-[#c5a059]/50 py-6 md:py-8 shadow-[0_0_30px_rgba(197,160,89,0.15)] flex flex-col items-center justify-center">
+                                <p className="text-[#c5a059] font-serif text-3xl md:text-4xl font-light tracking-[0.4em] uppercase ml-[0.4em]">Sold Out</p>
+                                <div className="h-px w-16 bg-[#c5a059]/30 mt-3"></div>
+                            </div>
+                        </div>
+                    )}
                 </div>
-                <button onClick={toggleWishlist} className={`md:hidden absolute top-4 right-4 h-10 w-10 bg-[#1a0505]/80 backdrop-blur rounded-full flex items-center justify-center border transition-colors z-10 ${isWishlisted ? 'border-[#c5a059] text-red-600' : 'border-[#e5d5a3]/30 text-[#e5d5a3]'}`}><HeartIcon filled={isWishlisted} className="h-5 w-5" /></button>
+                <button onClick={toggleWishlist} className={`md:hidden absolute top-4 right-4 h-10 w-10 bg-[#1a0505]/80 backdrop-blur rounded-full flex items-center justify-center border transition-colors z-20 ${isWishlisted ? 'border-[#c5a059] text-red-600' : 'border-[#e5d5a3]/30 text-[#e5d5a3]'}`}><HeartIcon filled={isWishlisted} className="h-5 w-5" /></button>
             </div>
 
             {product.gallery && product.gallery.length > 1 && (
@@ -463,59 +501,27 @@ export default function ProductPage() {
             <h1 className="text-3xl md:text-5xl font-serif text-[#f4e4bc] mb-2 leading-tight">{product.name}</h1>
             <div className="flex items-center gap-2 mb-6 text-sm"><StarRatingDisplay rating={avgRating} /><span className="text-[#e5d5a3]/50 hover:text-[#e5d5a3] cursor-pointer border-b border-[#e5d5a3]/30">{reviews.length} ratings</span></div>
             <div className="h-px w-full bg-[#e5d5a3]/10 mb-6"></div>
-            <p className="text-4xl text-[#c5a059] mb-2 font-serif">₹{product.price.toLocaleString("en-IN")}</p>
+            <p className={`text-4xl text-[#c5a059] mb-2 font-serif ${product.is_sold_out ? 'opacity-50' : ''}`}>₹{product.price.toLocaleString("en-IN")}</p>
             <p className="text-[#e5d5a3]/50 text-xs uppercase tracking-wider mb-8">Inclusive of all taxes</p>
             
             <div className="space-y-3 mb-8">
-                <button onClick={handleBuyNow} disabled={buying} className="w-full bg-[#c5a059] text-[#1a0505] py-4 font-bold uppercase tracking-widest hover:bg-[#e5d5a3] transition-all shadow-lg text-sm md:text-base disabled:opacity-50 rounded">{buying ? "Processing..." : "Buy Now"}</button>
-                <div className="flex gap-3">
-                    <button onClick={() => handleAddToCart(product)} className={`flex-1 border py-4 font-bold uppercase tracking-widest transition-all text-sm md:text-base rounded flex items-center justify-center gap-2 ${addedToCart ? "bg-green-800 border-green-800 text-white" : "bg-[#2a0808] border-[#c5a059] text-[#c5a059] hover:bg-[#c5a059]/10"}`}>{addedToCart ? (<><CheckIcon className="h-5 w-5 animate-check" /> Added</>) : ("Add to Cart")}</button>
-                    <button onClick={toggleWishlist} className={`px-6 border transition-all flex items-center justify-center rounded ${isWishlisted ? 'border-[#c5a059] text-red-600 bg-[#c5a059]/10' : 'border-[#e5d5a3]/30 text-[#e5d5a3] hover:border-[#c5a059] hover:text-[#c5a059]'}`}><HeartIcon filled={isWishlisted} className="h-6 w-6" /></button>
-                </div>
-            </div>
-
-            {/* 🌟 FREQUENTLY BOUGHT TOGETHER (FBT) MODULE 🌟 */}
-            {fbtLoading && (
-                <div className="bg-[#2a0808]/50 border border-[#e5d5a3]/10 p-6 rounded mb-8 animate-pulse flex items-center justify-center h-[160px]">
-                    <span className="text-[#c5a059] text-xs uppercase tracking-widest">Analyzing Market Baskets...</span>
-                </div>
-            )}
-            
-            {!fbtLoading && fbtProduct && (
-                <div className="bg-[#1a0505] border border-[#c5a059]/30 p-5 md:p-6 rounded shadow-[0_0_20px_rgba(197,160,89,0.05)] mb-8">
-                    <h3 className="font-serif text-lg text-[#f4e4bc] mb-4 flex items-center gap-2">
-                        Frequently Bought Together
-                    </h3>
-                    
-                    <div className="flex items-center gap-3 md:gap-4 mb-6">
-                        <div className="h-16 w-16 md:h-20 md:w-20 bg-[#2a0808] rounded border border-[#e5d5a3]/20 overflow-hidden shrink-0">
-                            <img src={product.image_url} className="h-full w-full object-cover opacity-90" />
-                        </div>
-                        <div className="text-[#c5a059] font-bold text-xl md:text-2xl">+</div>
-                        <Link href={`/product/${fbtProduct.id}?ref=fbt_apriori`} className="h-16 w-16 md:h-20 md:w-20 bg-[#2a0808] rounded border border-[#e5d5a3]/20 overflow-hidden shrink-0 group block cursor-pointer">
-                            <img src={fbtProduct.image_url} className="h-full w-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all" />
-                        </Link>
-                        
-                        <div className="flex-1 pl-2 hidden sm:block">
-                            <p className="text-xs text-[#e5d5a3] font-bold mb-1 truncate">This item: {product.name}</p>
-                            <p className="text-xs text-[#e5d5a3]/60 hover:text-[#c5a059] transition-colors truncate">
-                                <Link href={`/product/${fbtProduct.id}?ref=fbt_apriori`}>{fbtProduct.name}</Link>
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-t border-[#e5d5a3]/10 pt-4">
-                        <div>
-                            <p className="text-[10px] uppercase tracking-widest text-[#e5d5a3]/50 mb-1">Total Bundle Price</p>
-                            <p className="text-xl md:text-2xl font-serif text-[#c5a059]">₹{(product.price + fbtProduct.price).toLocaleString("en-IN")}</p>
-                        </div>
-                        <button onClick={handleAddBothToCart} disabled={addedBothToCart} className={`w-full sm:w-auto px-6 py-3 font-bold uppercase tracking-widest transition-all text-xs rounded flex items-center justify-center gap-2 shadow-lg ${addedBothToCart ? "bg-green-800 text-white border border-green-800" : "bg-[#c5a059]/10 border border-[#c5a059] text-[#c5a059] hover:bg-[#c5a059] hover:text-[#1a0505]"}`}>
-                            {addedBothToCart ? (<><CheckIcon className="h-4 w-4 animate-check" /> Added Both</>) : (<><ShoppingBagIcon className="h-4 w-4" /> Add Both to Cart</>)}
+                {product.is_sold_out ? (
+                    <div className="w-full flex gap-3">
+                        <button disabled className="flex-1 bg-transparent text-[#c5a059]/50 border border-[#c5a059]/20 py-4 font-bold uppercase tracking-[0.2em] text-xs md:text-sm rounded cursor-not-allowed flex flex-col items-center justify-center gap-1">
+                            <span className="text-[#c5a059]/40">Sold Out</span>
                         </button>
+                        <button onClick={toggleWishlist} className={`px-6 border transition-all flex items-center justify-center rounded ${isWishlisted ? 'border-[#c5a059] text-red-600 bg-[#c5a059]/10' : 'border-[#e5d5a3]/30 text-[#e5d5a3] hover:border-[#c5a059] hover:text-[#c5a059]'}`}><HeartIcon filled={isWishlisted} className="h-6 w-6" /></button>
                     </div>
-                </div>
-            )}
-            {/* 🌟 END FBT MODULE 🌟 */}
+                ) : (
+                    <>
+                        <button onClick={handleBuyNow} disabled={buying} className="w-full bg-[#c5a059] text-[#1a0505] py-4 font-bold uppercase tracking-widest hover:bg-[#e5d5a3] transition-all shadow-lg text-sm md:text-base disabled:opacity-50 rounded">{buying ? "Processing..." : "Buy Now"}</button>
+                        <div className="flex gap-3">
+                            <button onClick={() => handleAddToCart(product)} className={`flex-1 border py-4 font-bold uppercase tracking-widest transition-all text-sm md:text-base rounded flex items-center justify-center gap-2 ${addedToCart ? "bg-green-800 border-green-800 text-white" : "bg-[#2a0808] border-[#c5a059] text-[#c5a059] hover:bg-[#c5a059]/10"}`}>{addedToCart ? (<><CheckIcon className="h-5 w-5 animate-check" /> Added</>) : ("Add to Cart")}</button>
+                            <button onClick={toggleWishlist} className={`px-6 border transition-all flex items-center justify-center rounded ${isWishlisted ? 'border-[#c5a059] text-red-600 bg-[#c5a059]/10' : 'border-[#e5d5a3]/30 text-[#e5d5a3] hover:border-[#c5a059] hover:text-[#c5a059]'}`}><HeartIcon filled={isWishlisted} className="h-6 w-6" /></button>
+                        </div>
+                    </>
+                )}
+            </div>
 
             <div className="grid grid-cols-3 gap-2 text-center text-[10px] text-[#e5d5a3]/60 mb-8"><div className="bg-[#2a0808] p-3 rounded flex flex-col items-center gap-2"><span className="text-xl">✨</span><span>Premium Polish</span></div><div className="bg-[#2a0808] p-3 rounded flex flex-col items-center gap-2"><span className="text-xl">🚚</span><span>Fast Delivery</span></div><div className="bg-[#2a0808] p-3 rounded flex flex-col items-center gap-2"><span className="text-xl">🔒</span><span>Secure Pay</span></div></div>
             
@@ -525,6 +531,101 @@ export default function ProductPage() {
             </div>
         </div>
       </div>
+
+      {/* 🌟 NEW ELITE FREQUENTLY BOUGHT TOGETHER SECTION 🌟 */}
+      {fbtLoading && (
+          <div className="w-full py-12 border-t border-[#e5d5a3]/10 bg-[#1a0505]/50 flex items-center justify-center">
+              <span className="text-[#c5a059] text-xs uppercase tracking-widest animate-pulse">Analyzing Market Baskets...</span>
+          </div>
+      )}
+
+      {!fbtLoading && fbtProduct && !product.is_sold_out && !fbtProduct.is_sold_out && (
+          <section className="w-full py-12 md:py-16 border-t border-[#e5d5a3]/10 bg-gradient-to-b from-[#1a0505] to-[#2a0808]/20 relative overflow-hidden">
+              {/* Subtle Background Glow */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl h-full bg-[#c5a059]/5 blur-[120px] rounded-full pointer-events-none"></div>
+              
+              <div className="max-w-7xl mx-auto px-4 md:px-12 relative z-10">
+                  <h2 className="font-serif text-2xl text-[#f4e4bc] mb-8">Frequently Bought Together</h2>
+                  
+                  <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-start lg:items-center">
+                      
+                      {/* Images Flow */}
+                      <div className="flex items-center gap-4 md:gap-8 overflow-x-auto pb-4 w-full lg:w-auto [&::-webkit-scrollbar]:hidden">
+                          {/* Main Item */}
+                          <div className={`relative shrink-0 transition-all duration-500 ${!bundleSelection.main ? 'opacity-40 grayscale scale-95' : 'scale-100 shadow-[0_0_20px_rgba(197,160,89,0.15)]'}`}>
+                              <div className="block h-32 w-32 md:h-48 md:w-48 bg-[#2a0808] rounded border border-[#c5a059]/30 overflow-hidden">
+                                  <img src={product.image_url} className="h-full w-full object-cover" />
+                              </div>
+                          </div>
+                          
+                          <div className="text-[#c5a059] font-light text-2xl md:text-3xl shrink-0">+</div>
+                          
+                          {/* FBT Item */}
+                          <div className={`relative shrink-0 transition-all duration-500 ${!bundleSelection.fbt ? 'opacity-40 grayscale scale-95' : 'scale-100 shadow-[0_0_20px_rgba(197,160,89,0.15)]'}`}>
+                              <Link href={`/product/${fbtProduct.id}?ref=fbt_apriori`} className="block h-32 w-32 md:h-48 md:w-48 bg-[#2a0808] rounded border border-[#c5a059]/30 overflow-hidden group">
+                                  <img src={fbtProduct.image_url} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                              </Link>
+                          </div>
+                      </div>
+
+                      {/* Math & Add to Cart Box */}
+                      <div className="flex-1 w-full bg-[#1a0505]/80 backdrop-blur border border-[#e5d5a3]/10 p-6 md:p-8 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-8 shadow-2xl">
+                          <div className="space-y-5 w-full md:w-auto">
+                              
+                              {/* Custom Luxury Checkbox 1 */}
+                              <label className="flex items-start gap-4 cursor-pointer group">
+                                  <div className="relative flex items-center justify-center mt-1">
+                                      <input type="checkbox" checked={bundleSelection.main} onChange={() => setBundleSelection(p => ({...p, main: !p.main}))} className="peer sr-only" />
+                                      <div className="w-5 h-5 rounded border border-[#c5a059]/50 peer-checked:bg-[#c5a059] peer-checked:border-[#c5a059] transition-all flex items-center justify-center">
+                                          <CheckIcon className={`w-3 h-3 text-[#1a0505] transition-opacity ${bundleSelection.main ? 'opacity-100' : 'opacity-0'}`} />
+                                      </div>
+                                  </div>
+                                  <div className="flex flex-col">
+                                      <span className={`text-sm md:text-base font-bold transition-colors ${bundleSelection.main ? 'text-[#e5d5a3]' : 'text-[#e5d5a3]/50 line-through'}`}>
+                                          <span className="text-[#e5d5a3]/60 font-normal mr-2">This item:</span> 
+                                          {product.name}
+                                      </span>
+                                      <span className={`font-serif text-lg ${bundleSelection.main ? 'text-[#c5a059]' : 'text-[#c5a059]/50'}`}>₹{product.price.toLocaleString("en-IN")}</span>
+                                  </div>
+                              </label>
+                              
+                              {/* Custom Luxury Checkbox 2 */}
+                              <label className="flex items-start gap-4 cursor-pointer group">
+                                  <div className="relative flex items-center justify-center mt-1">
+                                      <input type="checkbox" checked={bundleSelection.fbt} onChange={() => setBundleSelection(p => ({...p, fbt: !p.fbt}))} className="peer sr-only" />
+                                      <div className="w-5 h-5 rounded border border-[#c5a059]/50 peer-checked:bg-[#c5a059] peer-checked:border-[#c5a059] transition-all flex items-center justify-center">
+                                          <CheckIcon className={`w-3 h-3 text-[#1a0505] transition-opacity ${bundleSelection.fbt ? 'opacity-100' : 'opacity-0'}`} />
+                                      </div>
+                                  </div>
+                                  <div className="flex flex-col">
+                                      <Link href={`/product/${fbtProduct.id}?ref=fbt_apriori`} className={`text-sm md:text-base font-bold transition-colors ${bundleSelection.fbt ? 'text-[#e5d5a3] hover:text-[#c5a059]' : 'text-[#e5d5a3]/50 line-through'}`}>
+                                          {fbtProduct.name}
+                                      </Link>
+                                      <span className={`font-serif text-lg ${bundleSelection.fbt ? 'text-[#c5a059]' : 'text-[#c5a059]/50'}`}>₹{fbtProduct.price.toLocaleString("en-IN")}</span>
+                                  </div>
+                              </label>
+                          </div>
+
+                          <div className="w-full md:w-auto flex flex-col items-start md:items-end gap-5 border-t md:border-t-0 md:border-l border-[#e5d5a3]/10 pt-6 md:pt-0 md:pl-8">
+                              <div className="text-left md:text-right">
+                                  <p className="text-[10px] uppercase tracking-widest text-[#e5d5a3]/50 mb-1">Total Bundle Price</p>
+                                  <p className="text-4xl font-serif text-[#c5a059]">
+                                      ₹{((bundleSelection.main ? product.price : 0) + (bundleSelection.fbt ? fbtProduct.price : 0)).toLocaleString("en-IN")}
+                                  </p>
+                              </div>
+                              <button 
+                                  onClick={handleAddBundleToCart} 
+                                  disabled={addedBothToCart || (!bundleSelection.main && !bundleSelection.fbt)} 
+                                  className={`w-full md:w-auto px-8 py-4 font-bold uppercase tracking-widest whitespace-nowrap transition-all text-xs md:text-sm rounded shadow-[0_0_20px_rgba(197,160,89,0.2)] flex items-center justify-center gap-2 ${addedBothToCart ? "bg-green-800 text-white" : (!bundleSelection.main && !bundleSelection.fbt) ? "bg-[#2a0808] text-[#e5d5a3]/30 cursor-not-allowed shadow-none" : "bg-[#c5a059] text-[#1a0505] hover:bg-[#e5d5a3]"}`}
+                              >
+                                  {addedBothToCart ? (<><CheckIcon className="w-4 h-4 animate-check" /> Added to Cart</>) : "Add Selected"}
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </section>
+      )}
 
       {/* 🚀 THE ROYAL CAROUSEL 🚀 */}
       {relatedProducts.length > 0 && (

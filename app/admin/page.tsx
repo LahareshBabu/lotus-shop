@@ -434,6 +434,12 @@ function AdminContent() {
                       <PlusIcon /> Add Product
                   </Link>
               )}
+              
+              {/* 🔥 NEW FEATURE: ALL PRODUCTS BUTTON 🔥 */}
+              <Link href="/admin/products" className="shrink-0 bg-[#1a0505] border border-[#e5d5a3]/30 text-[#e5d5a3] px-6 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-[#e5d5a3] hover:text-[#1a0505] transition-all flex items-center">
+                  All Products
+              </Link>
+
               {isHistoryMode && (
                   <Link href="/admin" className="shrink-0 text-xs uppercase tracking-widest text-[#c5a059] border border-[#c5a059] px-6 py-2 rounded hover:bg-[#c5a059] hover:text-[#1a0505] transition-all">
                       ← Back to Dashboard
