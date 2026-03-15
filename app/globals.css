@@ -144,3 +144,15 @@ body {
 .p-10 { --tx: 14px; --ty: 0px;  font-size: 10px !important; }
 .p-11 { --tx: 0px; --ty: 14px;  font-size: 10px !important; }
 .p-12 { --tx: -14px; --ty: 0px; font-size: 10px !important; }
+
+/* 🌟 Custom Luxury Scrollbar for Admin Dropdown 🌟 */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #1a0505;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #c5a059;
+  border-radius: 3px;
+}

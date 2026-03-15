@@ -11,6 +11,7 @@ function UploadIcon({ className="h-8 w-8" }) { return <svg className={className}
 function CheckCircle({ className="h-16 w-16" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> }
 function XIcon({ className="h-4 w-4" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg> }
 function PlusIcon({ className="h-5 w-5" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg> }
+function ChevronDown({ className="h-4 w-4" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg> }
 
 export default function UploadPage() {
   const router = useRouter()
@@ -24,6 +25,17 @@ export default function UploadPage() {
   const [description, setDescription] = useState("")
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [previewUrls, setPreviewUrls] = useState<string[]>([])
+  
+  // Custom Dropdown State
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+
+  const categoryGroups = [
+    { name: "Neckwear", items: ["Necklaces", "Long Haram", "Chokers", "Attigai", "Chains"] },
+    { name: "Earrings", items: ["Jhumkas & Studs", "Mattal", "Micro Plated Earrings"] },
+    { name: "Bangles & Rings", items: ["Bangles", "Finger Rings", "Bracelets", "Anklets"] },
+    { name: "Bridal Collection", items: ["Full Bridal Sets", "Semi Bridal Sets", "Combo Sets"] },
+    { name: "Accessories", items: ["Hair Accessories", "Nethi Chutti", "Hip Chains"] },
+  ]
 
   useEffect(() => {
     async function checkUser() {
@@ -89,7 +101,7 @@ export default function UploadPage() {
           })
 
           if (dbError) throw dbError
-          setSuccess(true) // 🌟 Keeps the success screen open
+          setSuccess(true)
 
       } catch (error: any) {
           console.error(error)
@@ -98,7 +110,6 @@ export default function UploadPage() {
       }
   }
 
-  // 🌟 NEW SUCCESS SCREEN (Doesn't disappear automatically)
   if (success) {
       return (
           <div className="min-h-screen bg-[#1a0505] flex flex-col items-center justify-center text-[#e5d5a3] animate-fade-in relative p-4">
@@ -174,24 +185,57 @@ export default function UploadPage() {
           </div>
 
           {/* RIGHT: Form */}
-          <form onSubmit={handlePublish} className="space-y-6">
+          <form onSubmit={handlePublish} className="space-y-6 relative">
               <div>
                   <label className="block text-xs uppercase tracking-widest text-[#e5d5a3]/50 mb-2">Product Name</label>
                   <input required value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Royal Emerald Choker" className="w-full bg-[#2a0808] border border-[#e5d5a3]/20 p-4 text-[#e5d5a3] focus:border-[#c5a059] outline-none rounded transition-all" />
               </div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-6 relative">
                   <div>
                       <label className="block text-xs uppercase tracking-widest text-[#e5d5a3]/50 mb-2">Price (₹)</label>
                       <input required type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="1500" className="w-full bg-[#2a0808] border border-[#e5d5a3]/20 p-4 text-[#e5d5a3] focus:border-[#c5a059] outline-none rounded transition-all" />
                   </div>
-                  <div>
+                  
+                  {/* CUSTOM HEADLESS DROPDOWN */}
+                  <div className="relative">
                       <label className="block text-xs uppercase tracking-widest text-[#e5d5a3]/50 mb-2">Category</label>
-                      <select value={category} onChange={e => setCategory(e.target.value)} className="w-full bg-[#2a0808] border border-[#e5d5a3]/20 p-4 text-[#e5d5a3] focus:border-[#c5a059] outline-none rounded transition-all cursor-pointer">
-                          <option value="Necklaces">Necklaces</option>
-                          <option value="Earrings">Earrings</option>
-                          <option value="Bangles">Bangles</option>
-                          <option value="Bridal Sets">Bridal Sets</option>
-                      </select>
+                      <div 
+                          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                          className="w-full bg-[#2a0808] border border-[#e5d5a3]/20 p-4 text-[#e5d5a3] hover:border-[#c5a059] outline-none rounded transition-all cursor-pointer flex justify-between items-center"
+                      >
+                          <span>{category}</span>
+                          <ChevronDown className={`h-4 w-4 text-[#c5a059] transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                      </div>
+
+                      {isDropdownOpen && (
+                          <>
+                              {/* Invisible overlay to close dropdown when clicking outside */}
+                              <div className="fixed inset-0 z-10" onClick={() => setIsDropdownOpen(false)}></div>
+                              
+                              <div className="absolute z-20 w-full mt-2 bg-[#1a0505] border border-[#c5a059]/40 rounded max-h-[300px] overflow-y-auto shadow-[0_10px_40px_rgba(0,0,0,0.8)] custom-scrollbar">
+                                  {categoryGroups.map((group, gIdx) => (
+                                      <div key={gIdx}>
+                                          <div className="bg-[#2a0808] text-[#c5a059] font-bold tracking-widest text-[10px] p-3 uppercase sticky top-0 z-10 border-b border-t first:border-t-0 border-[#c5a059]/10 shadow-sm">
+                                              {group.name}
+                                          </div>
+                                          {group.items.map((item, iIdx) => (
+                                              <div 
+                                                  key={iIdx}
+                                                  onClick={() => { setCategory(item); setIsDropdownOpen(false); }}
+                                                  className={`p-3 text-sm cursor-pointer transition-all duration-200 pl-6 ${
+                                                      category === item 
+                                                      ? 'bg-[#c5a059] text-[#1a0505] font-bold' 
+                                                      : 'text-[#e5d5a3] hover:bg-[#c5a059]/20 hover:text-white'
+                                                  }`}
+                                              >
+                                                  {item}
+                                              </div>
+                                          ))}
+                                      </div>
+                                  ))}
+                              </div>
+                          </>
+                      )}
                   </div>
               </div>
               <div>
