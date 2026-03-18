@@ -86,16 +86,12 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
   const [imgLoaded, setImgLoaded] = useState(false)
   const [isGlittering, setIsGlittering] = useState(false)
 
-  // 🚀 LEAD ENGINEER ADDITION: The Telemetry Tracker
   const trackInteraction = (eventType: string) => {
-      // Create a persistent anonymous session ID if none exists
       let sessionId = "unknown";
       if (typeof window !== "undefined") {
           sessionId = localStorage.getItem("lotus_session_id") || "sess_" + Math.random().toString(36).substring(2, 15);
           localStorage.setItem("lotus_session_id", sessionId);
       }
-
-      // Secretly ping the Python Data Lake
       fetch("http://127.0.0.1:8000/api/track", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -103,9 +99,9 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
               user_id: sessionId,
               product_id: product.id,
               event_type: eventType,
-              recommendation_model: "homepage_featured" // Tells AI where this click came from
+              recommendation_model: "homepage_featured" 
           })
-      }).catch(err => console.log("Telemetry skipped (Server might be sleeping)"));
+      }).catch(err => console.log("Telemetry skipped"));
   }
 
   const handleWishlistClick = (e: React.MouseEvent) => {
@@ -115,7 +111,6 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
           setTimeout(() => setIsGlittering(false), 700); 
       }
       onToggleWishlist(product);
-      // Track wishlist adds!
       trackInteraction('wishlist');
   }
 
@@ -125,10 +120,7 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
         style={{ animationDelay: `${index * 100}ms` }}
     >
       <div className={`relative aspect-[3/4] overflow-hidden bg-[#1a0505] flex items-center justify-center rounded-t ${product.is_sold_out ? 'cursor-default' : 'group cursor-pointer'}`}>
-        {/* 🚀 AI TRACKER ATTACHED: Logs when a user clicks to view a product */}
         <Link href={`/product/${product.id}`} className="absolute inset-0 z-0" onClick={() => trackInteraction('view')}>
-            
-            {/* 🌟 FIX: DEDICATED WRAPPER FOR GRAYSCALE TO PREVENT CSS CONFLICTS 🌟 */}
             <div className={`absolute inset-0 ${product.is_sold_out ? 'grayscale opacity-50' : ''}`}>
                 {product.image_url ? 
                     <img 
@@ -142,7 +134,6 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
                 }
             </div>
 
-            {/* 🌟 ELITE SOLD OUT OVERLAY (CAROUSEL) 🌟 */}
             {product.is_sold_out && (
                 <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
                     <div className="w-full bg-[#1a0505]/80 border-y border-[#c5a059]/30 py-3 flex justify-center shadow-lg">
@@ -179,7 +170,6 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
                         onAddToCart(product); 
                         setAddedEffect(true); 
                         setTimeout(() => setAddedEffect(false), 2000); 
-                        // 🚀 AI TRACKER ATTACHED: Logs an Add To Cart event!
                         trackInteraction('add_to_cart');
                     }} 
                     className={`w-full py-3 font-sans text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-300 ${addedEffect ? "bg-green-700 text-white" : "bg-[#e5d5a3]/90 backdrop-blur text-[#1a0505] hover:bg-white"}`}
@@ -195,7 +185,6 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
       </div>
       
       <div className={`flex flex-1 flex-col gap-2 p-5 bg-gradient-to-b from-[#2a0808] to-[#1a0505] ${product.is_sold_out ? 'opacity-70' : ''}`}>
-        {/* 🚀 AI TRACKER ATTACHED: Logs when a user clicks the title link */}
         <Link href={`/product/${product.id}`} className="hover:text-[#c5a059] transition-colors duration-300" onClick={() => trackInteraction('view')}>
             <h3 className="font-serif text-lg font-medium tracking-wide text-[#e5d5a3] line-clamp-1">{product.name}</h3>
         </Link>
@@ -226,10 +215,8 @@ export default function Page() {
   const [suggestions, setSuggestions] = useState<any[]>([])
   const searchRef = useRef<HTMLDivElement>(null)
 
-  // 🌟 MEGA MENU STATE 🌟
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null)
 
-  // CINEMATIC SCROLL LOGIC
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
@@ -245,7 +232,6 @@ export default function Page() {
     return () => elements.forEach(el => observer.unobserve(el))
   }, [products]) 
 
-  // SEARCH LOGIC
   useEffect(() => {
     const fetchSuggestions = async () => {
         if (searchTerm.length < 2) { setSuggestions([]); return }
@@ -272,28 +258,53 @@ export default function Page() {
       document.addEventListener("mousedown", handleClickOutside); return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
+  // 🌟 FORTRESS DATA SYNCHRONIZER: Ensures Homepage, Cart, and Wishlist ALWAYS match Supabase DB 🌟
   useEffect(() => {
     async function init() {
         try {
-            const res = await fetch('/api/products');
-            const json = await res.json();
-            if (json.products) setProducts(json.products);
+            // 1. Directly fetch from Supabase to bypass Next.js API caching entirely
+            const { data: freshProducts, error } = await supabase.from('products').select('*');
+            
+            if (error) {
+                console.error("Supabase fetch failed", error);
+                return;
+            }
+
+            if (freshProducts) {
+                // Update Homepage Grid
+                setProducts(freshProducts);
+
+                // 2. Sync Cart LocalStorage with Fresh DB Data
+                const rawCart = JSON.parse(localStorage.getItem('cart') || '[]');
+                const cleanCart: any[] = [];
+                rawCart.forEach((item: any) => {
+                    const freshData = freshProducts.find(p => p.id === item.id) || item; // Get fresh is_sold_out status
+                    const existing = cleanCart.find(i => i.id === item.id);
+                    const qty = (item.quantity !== undefined && !isNaN(item.quantity)) ? item.quantity : 1;
+                    if (existing) { 
+                        existing.quantity += qty;
+                    } else { 
+                        cleanCart.push({ ...item, ...freshData, quantity: qty }); // Override stale local data
+                    }
+                });
+                localStorage.setItem('cart', JSON.stringify(cleanCart)); 
+                setCart(cleanCart);
+                
+                // 3. Sync Wishlist LocalStorage with Fresh DB Data
+                const rawWishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
+                const cleanWishlist = rawWishlist.map((item: any) => {
+                    const freshData = freshProducts.find(p => p.id === item.id) || item;
+                    return { ...item, ...freshData }; // Override stale local data
+                });
+                setWishlist(cleanWishlist);
+                localStorage.setItem('wishlist', JSON.stringify(cleanWishlist));
+            }
         } catch (error) {
-            console.error("Failed to fetch products", error);
+            console.error("Sync failed", error);
         }
 
-        const { data: { session } } = await supabase.auth.getSession(); if (session) setUser(session.user)
-        
-        const rawCart = JSON.parse(localStorage.getItem('cart') || '[]')
-        const cleanCart: any[] = []
-        rawCart.forEach((item: any) => {
-            const existing = cleanCart.find(i => i.id === item.id)
-            const qty = (item.quantity !== undefined && !isNaN(item.quantity)) ? item.quantity : 1
-            if (existing) { existing.quantity += qty } else { cleanCart.push({ ...item, quantity: qty }) }
-        })
-        localStorage.setItem('cart', JSON.stringify(cleanCart)); setCart(cleanCart)
-        
-        const storedWishlist = JSON.parse(localStorage.getItem('wishlist') || '[]'); setWishlist(storedWishlist)
+        const { data: { session } } = await supabase.auth.getSession(); 
+        if (session) setUser(session.user);
     }
     init()
   }, [])
@@ -315,7 +326,10 @@ export default function Page() {
   }
 
   const toggleWishlist = (product: any) => { const exists = wishlist.find(i => i.id === product.id); let newW; if(exists) newW = wishlist.filter(i=>i.id!==product.id); else newW=[...wishlist, product]; setWishlist(newW); localStorage.setItem('wishlist', JSON.stringify(newW)) }
-  const cartTotal = cart.reduce((t, i) => t + (i.price * (i.quantity || 1)), 0)
+  
+  // 🌟 FIX: Only calculate total for items that are NOT sold out 🌟
+  const cartTotal = cart.filter(i => !i.is_sold_out).reduce((t, i) => t + (i.price * (i.quantity || 1)), 0)
+  
   const scrollTo = (id: string) => { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); setMobileMenuOpen(false) }
   const updateQuantity = (i: number, c: number) => { const n = [...cart]; n[i].quantity = (n[i].quantity||1)+c; if(n[i].quantity<0)return; setCart(n); localStorage.setItem('cart', JSON.stringify(n)) }
   const removeFromCart = (i: number) => { const n = cart.filter((_, idx) => idx !== i); setCart(n); localStorage.setItem('cart', JSON.stringify(n)) }
@@ -335,7 +349,6 @@ export default function Page() {
         }
       `}} />
 
-      {/* 🌟 HEADER START 🌟 */}
       <header className="sticky top-0 z-40 bg-[#1a0505]/95 backdrop-blur-md transition-all duration-500 shadow-lg" onMouseLeave={() => setHoveredCategory(null)}>
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 lg:px-8 gap-8 relative z-50">
           
@@ -392,7 +405,6 @@ export default function Page() {
           </nav>
         </div>
 
-        {/* 🌟 MEGA MENU NAVIGATION BAR 🌟 */}
         <div className="border-t border-[#e5d5a3]/5 bg-[#2a0808]/30 backdrop-blur-sm relative">
             <div className="mx-auto max-w-7xl px-4 flex justify-center gap-8 md:gap-16">
                 {MEGA_MENU.map((category) => (
@@ -406,14 +418,12 @@ export default function Page() {
                             className={`text-xs md:text-sm uppercase tracking-[0.15em] hover:text-[#c5a059] hover:font-bold transition-all relative block ${hoveredCategory === category.name ? 'text-[#c5a059] font-bold' : 'text-[#e5d5a3]/70'}`}
                         >
                             {category.name}
-                            {/* Gold Underline Animation */}
                             <span className={`absolute bottom-[-17px] left-1/2 -translate-x-1/2 h-0.5 bg-[#c5a059] transition-all duration-300 ease-out ${hoveredCategory === category.name ? 'w-full' : 'w-0'}`}></span>
                         </Link>
                     </div>
                 ))}
             </div>
 
-            {/* 🌟 THE MEGA MENU DROPDOWN PANEL 🌟 */}
             <div className={`absolute top-full left-0 w-full bg-[#1a0505]/95 backdrop-blur-xl border-t border-[#e5d5a3]/10 shadow-2xl transition-all duration-300 overflow-hidden ${hoveredCategory ? 'max-h-[500px] opacity-100 visible' : 'max-h-0 opacity-0 invisible'}`}>
                 <div className="mx-auto max-w-7xl px-8 py-10">
                     {MEGA_MENU.map((category) => (
@@ -433,7 +443,6 @@ export default function Page() {
             </div>
         </div>
       </header>
-      {/* 🌟 HEADER END 🌟 */}
 
       {isLoginOpen && (<div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"><div className="bg-[#2a0808] border border-[#e5d5a3]/30 p-8 w-full max-w-md shadow-2xl relative"><button onClick={() => setIsLoginOpen(false)} className="absolute top-4 right-4 text-[#e5d5a3]/50 hover:text-white"><XIcon /></button><h2 className="font-serif text-2xl text-[#f4e4bc] mb-2 text-center">Member Login</h2><p className="text-center text-[#e5d5a3]/50 text-xs mb-6 uppercase tracking-widest">We will send a magic link to your email</p>{!loginMessage ? (<form onSubmit={handleLogin} className="space-y-4"><input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="name@example.com" className="w-full bg-[#1a0505] border border-[#e5d5a3]/20 p-3 text-[#e5d5a3] outline-none focus:border-[#e5d5a3]" /><button disabled={loadingLogin} className="w-full bg-[#e5d5a3] text-[#1a0505] py-3 font-bold uppercase tracking-widest hover:bg-white disabled:opacity-50">{loadingLogin ? "Sending..." : "Send Login Link"}</button></form>) : (<div className="text-center text-green-400 p-4 border border-green-500/20 bg-green-500/10">{loginMessage}</div>)}</div></div>)}
       
@@ -459,7 +468,18 @@ export default function Page() {
                   <div key={item.id} className="flex gap-4 p-2 border-b border-[#e5d5a3]/10 items-center">
                       <div className="h-14 w-14 bg-[#2a0808] rounded overflow-hidden"><img src={item.image_url} className="h-full w-full object-cover" /></div>
                       <div className="flex-1"><p className="text-sm text-[#e5d5a3] font-serif">{item.name}</p><p className="text-xs text-[#e5d5a3]/60">₹{item.price.toLocaleString("en-IN")}</p></div>
-                      <div className="flex gap-2 items-center"><button onClick={() => addToCart(item)} className="text-[10px] bg-[#e5d5a3] text-black px-2 py-1 font-bold uppercase hover:bg-white rounded tracking-wider">Add</button><button onClick={() => toggleWishlist(item)} className="text-[#e5d5a3]/40 hover:text-red-400 transition-colors p-1" title="Remove"><XIcon className="h-4 w-4" /></button></div>
+                      <div className="flex gap-2 items-center">
+                          {item.is_sold_out ? (
+                              <span className="text-[10px] text-[#e5d5a3]/40 uppercase tracking-widest font-bold px-2 py-1 border border-[#e5d5a3]/10 rounded cursor-not-allowed">
+                                  Out of Stock
+                              </span>
+                          ) : (
+                              <button onClick={() => addToCart(item)} className="text-[10px] bg-[#e5d5a3] text-black px-2 py-1 font-bold uppercase hover:bg-white rounded tracking-wider">
+                                  Add
+                              </button>
+                          )}
+                          <button onClick={() => toggleWishlist(item)} className="text-[#e5d5a3]/40 hover:text-red-400 transition-colors p-1" title="Remove"><XIcon className="h-4 w-4" /></button>
+                      </div>
                   </div>
               ))}
           </div>
@@ -472,7 +492,32 @@ export default function Page() {
       <div className={`fixed top-0 right-0 z-50 h-full w-full max-w-sm bg-[#2a0808] border-l border-[#e5d5a3]/20 shadow-2xl transition-transform duration-300 transform ${isCartOpen ? 'translate-x-0' : 'translate-x-full'} flex flex-col`}>
           <div className="flex items-center justify-between p-6 border-b border-[#e5d5a3]/10 pb-4"><h2 className="font-serif text-xl font-bold tracking-wide text-[#f4e4bc]">Your Bag ({cart.length})</h2><button onClick={() => setIsCartOpen(false)} className="text-[#e5d5a3]/60 hover:text-white"><XIcon className="w-6 h-6" /></button></div>
           <div className="flex-1 overflow-y-auto space-y-4 p-6 [&::-webkit-scrollbar]:w-3.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[#c5a059] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border-[3px] [&::-webkit-scrollbar-thumb]:border-solid [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:[background-clip:padding-box] hover:[&::-webkit-scrollbar-thumb]:bg-[#e5d5a3]">
-              {cart.length === 0 ? <div className="text-center py-10 text-[#e5d5a3]/40 font-sans italic">Your royal bag is empty.</div> : cart.map((item, idx) => (<div key={idx} className="flex gap-4 bg-[#1a0505]/50 p-3 rounded border border-[#e5d5a3]/10"><div className="h-16 w-16 bg-[#1a0505] flex-shrink-0 overflow-hidden rounded-sm border border-[#e5d5a3]/10">{item.image_url && <img src={item.image_url} className="h-full w-full object-cover" />}</div><div className="flex-1 flex flex-col justify-between"><div><h4 className="font-serif text-sm text-[#e5d5a3] leading-tight">{item.name}</h4><p className="text-xs text-[#c5a059] mt-1 font-bold">₹{item.price.toLocaleString("en-IN")}</p></div><div className="flex items-center gap-3 bg-[#2a0808] border border-[#e5d5a3]/20 w-fit px-2 py-0.5 rounded mt-2"><button onClick={() => updateQuantity(idx, -1)} className="text-[#e5d5a3] hover:text-white text-xs px-1">-</button><span className="text-xs font-bold text-[#f4e4bc]">{item.quantity !== undefined ? item.quantity : 1}</span><button onClick={() => updateQuantity(idx, 1)} className="text-[#e5d5a3] hover:text-white text-xs px-1">+</button></div></div><button onClick={() => removeFromCart(idx)} className="self-start text-[#e5d5a3]/40 hover:text-red-400 transition-colors"><TrashIcon /></button></div>))}
+              {cart.length === 0 ? <div className="text-center py-10 text-[#e5d5a3]/40 font-sans italic">Your royal bag is empty.</div> : cart.map((item, idx) => (
+                  <div key={idx} className="flex gap-4 bg-[#1a0505]/50 p-3 rounded border border-[#e5d5a3]/10">
+                      <div className="h-16 w-16 bg-[#1a0505] flex-shrink-0 overflow-hidden rounded-sm border border-[#e5d5a3]/10">
+                          {item.image_url && <img src={item.image_url} className="h-full w-full object-cover" />}
+                      </div>
+                      <div className="flex-1 flex flex-col justify-between">
+                          <div>
+                              <h4 className="font-serif text-sm text-[#e5d5a3] leading-tight">{item.name}</h4>
+                              <p className="text-xs text-[#c5a059] mt-1 font-bold">₹{item.price.toLocaleString("en-IN")}</p>
+                          </div>
+                          {/* 🌟 FIX: CART SIDEBAR SOLD OUT LOGIC 🌟 */}
+                          {item.is_sold_out ? (
+                              <div className="mt-2 inline-block bg-red-900/30 border border-red-500/30 text-red-400 text-[10px] px-2 py-1 rounded uppercase tracking-widest font-bold w-fit">
+                                  Out of Stock
+                              </div>
+                          ) : (
+                              <div className="flex items-center gap-3 bg-[#2a0808] border border-[#e5d5a3]/20 w-fit px-2 py-0.5 rounded mt-2">
+                                  <button onClick={() => updateQuantity(idx, -1)} className="text-[#e5d5a3] hover:text-white text-xs px-1">-</button>
+                                  <span className="text-xs font-bold text-[#f4e4bc]">{item.quantity !== undefined ? item.quantity : 1}</span>
+                                  <button onClick={() => updateQuantity(idx, 1)} className="text-[#e5d5a3] hover:text-white text-xs px-1">+</button>
+                              </div>
+                          )}
+                      </div>
+                      <button onClick={() => removeFromCart(idx)} className="self-start text-[#e5d5a3]/40 hover:text-red-400 transition-colors"><TrashIcon /></button>
+                  </div>
+              ))}
           </div>
           <div className="mt-auto p-6 bg-[#2a0808] border-t border-[#e5d5a3]/20">
               <div className="flex justify-between mb-4 text-[#f4e4bc] font-bold"><span>Total</span><span>₹{cartTotal.toLocaleString("en-IN")}</span></div>
@@ -481,12 +526,25 @@ export default function Page() {
       </div>
 
       <section id="hero" className="relative overflow-hidden bg-[#1a0505] py-24 lg:py-40 border-b border-[#e5d5a3]/10">
-        <div className="absolute inset-0 z-0"><img src="https://fwyliqsazdyprlkemavu.supabase.co/storage/v1/object/public/jewelry-images/banner.jpg" alt="Royal Jewelry Background" className="h-full w-full object-cover opacity-40" /><div className="absolute inset-0 bg-gradient-to-t from-[#1a0505] via-[#2a0808]/60 to-[#1a0505]/30" /></div>
+        <div className="absolute inset-0 z-0">
+            <img src="https://fwyliqsazdyprlkemavu.supabase.co/storage/v1/object/public/jewelry-images/banner.jpg" alt="Royal Jewelry Background" className="h-full w-full object-cover opacity-40" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#1a0505] via-[#2a0808]/60 to-[#1a0505]/30" />
+        </div>
         <div className="relative mx-auto flex max-w-7xl flex-col items-center text-center px-6 lg:px-8 z-10">
-          <span className="mb-6 inline-block border border-[#e5d5a3]/60 px-6 py-2 font-sans text-xs font-bold uppercase tracking-[0.3em] text-[#e5d5a3] drop-shadow-md rounded animate-hero-1">Handcrafted Luxury</span>
-          <h1 className="max-w-4xl font-serif text-5xl font-medium leading-tight tracking-wide text-[#f4e4bc] md:text-7xl drop-shadow-lg animate-hero-2">Real Gold Look, <br /><span className="text-[#c5a059] italic">Affordable</span> Elegance</h1>
-          <p className="mt-8 max-w-xl font-sans text-sm leading-relaxed text-[#e5d5a3]/90 md:text-base drop-shadow-md animate-hero-3">Discover our exquisite collection of imitation jewelry that mirrors the grandeur of real gold.</p>
-          <div className="mt-12 flex flex-col sm:flex-row gap-4 animate-hero-btn"><button onClick={() => scrollTo('featured')} className="inline-flex items-center justify-center gap-2 bg-[#e5d5a3] px-10 py-4 font-sans text-xs font-bold uppercase tracking-widest text-[#1a0505] transition-all hover:bg-white hover:shadow-[0_0_20px_rgba(229,213,163,0.3)] cursor-pointer rounded">Shop Collection</button></div>
+          <span className="mb-6 inline-block border border-[#c5a059]/60 px-6 py-2 font-sans text-xs font-bold uppercase tracking-[0.3em] text-[#c5a059] drop-shadow-md rounded animate-hero-1">
+              Imitation Fine Jewelry
+          </span>
+          <h1 className="max-w-6xl font-serif text-5xl font-medium leading-tight tracking-wide text-[#f4e4bc] md:text-6xl lg:text-7xl drop-shadow-lg animate-hero-2">
+              Heritage Craftsmanship. <span className="text-[#c5a059] italic">Uncompromising</span> Elegance.
+          </h1>
+          <p className="mt-8 max-w-xl font-sans text-sm leading-relaxed text-[#e5d5a3]/90 md:text-base drop-shadow-md animate-hero-3">
+              Discover our exclusive collection of royal Indian designs, meticulously crafted to mirror the exact grandeur of solid gold.
+          </p>
+          <div className="mt-12 flex flex-col sm:flex-row gap-4 animate-hero-btn">
+              <button onClick={() => scrollTo('featured')} className="inline-flex items-center justify-center gap-2 bg-transparent border border-[#c5a059] px-10 py-4 font-sans text-xs font-bold uppercase tracking-[0.2em] text-[#c5a059] transition-all hover:bg-[#c5a059] hover:text-[#1a0505] hover:shadow-[0_0_20px_rgba(197,160,89,0.3)] cursor-pointer rounded">
+                  Shop Collection
+              </button>
+          </div>
         </div>
       </section>
 

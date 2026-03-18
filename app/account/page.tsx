@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 // CONFIGURATION
@@ -36,15 +36,18 @@ function WarningIcon({ className="h-12 w-12" }) { return <svg className={classNa
 
 function AccountContent() {
   const router = useRouter()
+  // 🌟 FIX: Using Search Params instead of sessionStorage to control the active tab state 🌟
+  const searchParams = useSearchParams()
+  const tabFromUrl = searchParams.get('tab')
+
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('dashboard') 
+  const [activeTab, setActiveTab] = useState(tabFromUrl || 'dashboard') 
   
   const [addresses, setAddresses] = useState<any[]>([])
   const [orders, setOrders] = useState<any[]>([])
   const [recentlyViewed, setRecentlyViewed] = useState<any[]>([])
   
-  // 🌟 NEW: Memory Ref for Scroll Position
   const ordersScrollRef = useRef<HTMLDivElement>(null)
 
   // FORM STATES
@@ -64,13 +67,17 @@ function AccountContent() {
   const stateDropdownRef = useRef<HTMLDivElement>(null)
   const cityDropdownRef = useRef<HTMLDivElement>(null)
 
-  // 🌟 NEW: Initialize State from Memory 🌟
+  // 🌟 FIX: Sync local state with URL changes seamlessly 🌟
+  useEffect(() => {
+    if (tabFromUrl) {
+        setActiveTab(tabFromUrl)
+    } else {
+        setActiveTab('dashboard')
+    }
+  }, [tabFromUrl])
+
   useEffect(() => {
     async function init() {
-      // 1. Restore Tab Memory
-      const savedTab = sessionStorage.getItem('lotus_account_tab')
-      if (savedTab) setActiveTab(savedTab)
-
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/'); return }
       setUser(session.user)
@@ -95,12 +102,10 @@ function AccountContent() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [router])
 
-  // 🌟 NEW: Restore Scroll Position Memory 🌟
   useEffect(() => {
       if (activeTab === 'orders' && orders.length > 0) {
           const savedScroll = sessionStorage.getItem('lotus_orders_scroll')
           if (savedScroll && ordersScrollRef.current) {
-              // requestAnimationFrame ensures the DOM is painted before scrolling
               requestAnimationFrame(() => {
                   if (ordersScrollRef.current) {
                       ordersScrollRef.current.scrollTop = parseInt(savedScroll, 10)
@@ -110,17 +115,25 @@ function AccountContent() {
       }
   }, [activeTab, orders])
 
-  // 🌟 NEW: Save Tab Memory 🌟
+  // 🌟 FIX: Soft URL pushes to manage history without reloading the page 🌟
   const switchTab = (tab: string) => {
       setActiveTab(tab)
-      sessionStorage.setItem('lotus_account_tab', tab)
+      router.push(`/account?tab=${tab}`, { scroll: false }) // Push to URL history
       if (tab !== 'orders') {
-          sessionStorage.removeItem('lotus_orders_scroll') // Clear scroll if leaving manually
+          sessionStorage.removeItem('lotus_orders_scroll') 
       }
   }
 
+  const goBackToDashboard = () => {
+      setActiveTab('dashboard')
+      setShowAddressForm(false)
+      setEditingId(null)
+      setShowStateDropdown(false)
+      setShowCityDropdown(false)
+      router.push('/account', { scroll: false }) // Clears the URL completely
+  }
+
   const handleLogout = async () => { 
-      sessionStorage.removeItem('lotus_account_tab')
       sessionStorage.removeItem('lotus_orders_scroll')
       await supabase.auth.signOut() 
       router.push('/') 
@@ -157,14 +170,6 @@ function AccountContent() {
       setFormData({ name: '', street: '', city: '', state: '', zip: '', phone: '', country: '' })
       setEditingId(null)
       setShowAddressForm(true)
-  }
-  
-  const goBackToDashboard = () => {
-      switchTab('dashboard')
-      setShowAddressForm(false)
-      setEditingId(null)
-      setShowStateDropdown(false)
-      setShowCityDropdown(false)
   }
 
   const handleSaveAddress = async (e: React.FormEvent) => {
@@ -263,7 +268,6 @@ function AccountContent() {
             {orders.length === 0 ? (
               <div className="p-8 border border-dashed border-[#e5d5a3]/20 rounded text-center text-[#e5d5a3]/40 italic">You haven't placed any orders yet.</div>
             ) : (
-              // 🌟 NEW: Scroll Memory Event Attached Here
               <div 
                   ref={ordersScrollRef} 
                   onScroll={(e) => sessionStorage.setItem('lotus_orders_scroll', e.currentTarget.scrollTop.toString())}

@@ -42,6 +42,9 @@ function CheckoutContent() {
         if (addrs) setSavedAddresses(addrs)
     }
 
+    // 🌟 FORTRESS DATA SYNCHRONIZER: Fetch freshest inventory from DB 🌟
+    const { data: freshProducts } = await supabase.from('products').select('id, is_sold_out, price')
+
     // FETCH ITEMS (Local + URL filter)
     const localCart = JSON.parse(localStorage.getItem('cart') || '[]')
     let itemsToDisplay = localCart;
@@ -49,6 +52,14 @@ function CheckoutContent() {
     if (itemsParam) {
         const idsArray = itemsParam.split(',')
         itemsToDisplay = localCart.filter((i: any) => idsArray.includes(String(i.id)))
+    }
+
+    // 🌟 Sync local items with fresh DB data to catch "is_sold_out" status 🌟
+    if (freshProducts) {
+        itemsToDisplay = itemsToDisplay.map((item: any) => {
+            const freshData = freshProducts.find(p => String(p.id) === String(item.id));
+            return { ...item, ...(freshData || {}) };
+        });
     }
 
     setCheckoutItems(itemsToDisplay)
@@ -82,37 +93,48 @@ function CheckoutContent() {
       localStorage.setItem('cart', JSON.stringify(newCart))
   }
 
-  const total = checkoutItems.reduce((acc, item) => acc + (item.price * (item.quantity || 1)), 0)
+  // 🌟 FIX: Only calculate total for items that are NOT sold out 🌟
+  const total = checkoutItems.filter(item => !item.is_sold_out).reduce((acc, item) => acc + (item.price * (item.quantity || 1)), 0)
+  
+  const validCheckoutItems = checkoutItems.filter(item => !item.is_sold_out)
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
       e.preventDefault()
+      
+      // 🌟 THE ULTIMATE FAIL-SAFE: Block if no valid items exist 🌟
+      if (validCheckoutItems.length === 0) {
+          alert("All items in your checkout are currently Out of Stock. Please review your cart.");
+          return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession()
       if(!session) return alert("Please login to place your royal order.")
 
       const orderId = `ORD-${Date.now()}`
 
+      // 🌟 Insert only the valid items into the order
       const { data: order, error } = await supabase.from('orders').insert({
           id: orderId,
           user_id: session.user.id,
           total: total,
           status: 'Processing',
-          items: { products: checkoutItems, shipping_details: formData }
+          items: { products: validCheckoutItems, shipping_details: formData }
       }).select().single()
 
       if (!error && order) {
           const currentCart = JSON.parse(localStorage.getItem('cart') || '[]')
-          const idsPurchased = checkoutItems.map(i => String(i.id))
+          const idsPurchased = validCheckoutItems.map(i => String(i.id))
           const remainingCart = currentCart.filter((i: any) => !idsPurchased.includes(String(i.id)))
           localStorage.setItem('cart', JSON.stringify(remainingCart))
           
           await supabase.from('cart').delete().in('id', idsPurchased)
           
           // =================================================================
-          // 🌟 THE FIX: OPTION A (TELEMETRY WALKIE-TALKIE)
+          // 🌟 TELEMETRY WALKIE-TALKIE
           // Ping the Python ML Engine so it knows what was just purchased!
           // =================================================================
           try {
-              await Promise.all(checkoutItems.map(item => 
+              await Promise.all(validCheckoutItems.map(item => 
                   fetch('http://localhost:8000/api/track', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -211,23 +233,36 @@ function CheckoutContent() {
                 <div className="space-y-6 mb-8 border-b border-[#e5d5a3]/10 pb-8">
                     {checkoutItems.map(item => (
                         <div key={item.id} className="flex gap-4 items-start relative group">
-                            <button onClick={() => removeItem(String(item.id))} className="absolute top-0 right-0 text-[#e5d5a3]/20 hover:text-red-500 transition-colors">
+                            <button onClick={() => removeItem(String(item.id))} className="absolute top-0 right-0 text-[#e5d5a3]/20 hover:text-red-500 transition-colors z-10">
                                 <TrashIcon />
                             </button>
-                            <div className="h-20 w-20 bg-[#1a0505] rounded overflow-hidden border border-[#e5d5a3]/10 flex-shrink-0">
-                                <img src={item.image_url} className="h-full w-full object-cover" />
+                            <div className="h-20 w-20 bg-[#1a0505] rounded overflow-hidden border border-[#e5d5a3]/10 flex-shrink-0 relative">
+                                <img src={item.image_url} className={`h-full w-full object-cover ${item.is_sold_out ? 'grayscale opacity-70' : ''}`} />
+                                {item.is_sold_out && (
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <div className="w-full bg-[#1a0505]/80 py-1 flex justify-center">
+                                            <span className="text-[#c5a059] text-[8px] font-bold uppercase tracking-widest">Sold Out</span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <div className="flex-1 pt-1">
-                                <h4 className="font-serif text-[#f4e4bc] text-lg leading-tight mb-2 pr-6">{item.name}</h4>
+                                <h4 className={`font-serif text-lg leading-tight mb-2 pr-6 ${item.is_sold_out ? 'text-[#e5d5a3]/70 line-through' : 'text-[#f4e4bc]'}`}>{item.name}</h4>
                                 <div className="flex items-center gap-4">
-                                    <div className="flex items-center border border-[#e5d5a3]/20 rounded bg-[#1a0505]">
-                                        <button onClick={() => updateQuantity(String(item.id), (item.quantity || 1) - 1)} className="px-2 text-[#c5a059] hover:bg-[#e5d5a3]/10">-</button>
-                                        <span className="text-xs text-[#e5d5a3] px-2 font-mono">{item.quantity || 1}</span>
-                                        <button onClick={() => updateQuantity(String(item.id), (item.quantity || 1) + 1)} className="px-2 text-[#c5a059] hover:bg-[#e5d5a3]/10">+</button>
-                                    </div>
+                                    {item.is_sold_out ? (
+                                        <div className="mt-1 inline-block bg-red-900/30 border border-red-500/30 text-red-400 text-[10px] px-2 py-1 rounded uppercase tracking-widest font-bold w-fit">
+                                            Out of Stock
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center border border-[#e5d5a3]/20 rounded bg-[#1a0505]">
+                                            <button onClick={() => updateQuantity(String(item.id), (item.quantity || 1) - 1)} className="px-2 text-[#c5a059] hover:bg-[#e5d5a3]/10">-</button>
+                                            <span className="text-xs text-[#e5d5a3] px-2 font-mono">{item.quantity || 1}</span>
+                                            <button onClick={() => updateQuantity(String(item.id), (item.quantity || 1) + 1)} className="px-2 text-[#c5a059] hover:bg-[#e5d5a3]/10">+</button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                            <p className="font-bold text-[#c5a059] self-center">₹{item.price.toLocaleString("en-IN")}</p>
+                            <p className={`font-bold self-center ${item.is_sold_out ? 'text-[#c5a059]/50' : 'text-[#c5a059]'}`}>₹{item.price.toLocaleString("en-IN")}</p>
                         </div>
                     ))}
                 </div>
@@ -241,8 +276,11 @@ function CheckoutContent() {
                     <span>₹{total.toLocaleString("en-IN")}</span>
                 </div>
 
-                <label htmlFor="submit-order" className="mt-8 w-full bg-[#c5a059] text-[#1a0505] py-4 rounded font-bold uppercase tracking-widest text-xs hover:bg-white transition-all shadow-lg text-center block cursor-pointer">
-                    Complete Checkout
+                <label 
+                    htmlFor={validCheckoutItems.length > 0 ? "submit-order" : ""} 
+                    className={`mt-8 w-full py-4 rounded font-bold uppercase tracking-widest text-xs transition-all text-center block ${validCheckoutItems.length > 0 ? 'bg-[#c5a059] text-[#1a0505] hover:bg-white shadow-lg cursor-pointer' : 'bg-[#e5d5a3]/10 text-[#e5d5a3]/30 cursor-not-allowed'}`}
+                >
+                    {validCheckoutItems.length > 0 ? "Complete Checkout" : "No Available Items"}
                 </label>
             </div>
 

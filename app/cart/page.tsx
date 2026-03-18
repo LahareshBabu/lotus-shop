@@ -18,21 +18,43 @@ export default function CartPage() {
   useEffect(() => { fetchCart() }, [])
 
   const fetchCart = async () => {
-    const localCart = JSON.parse(localStorage.getItem('cart') || '[]')
-    if (localCart.length > 0) {
-        setCartItems(localCart)
-        const allIds = new Set<string>(localCart.map((item: any) => String(item.id)))
-        setSelectedIds(allIds)
-        setLoading(false)
-        return
-    }
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session) {
-        const { data } = await supabase.from('cart').select('*').eq('user_id', session.user.id)
-        if (data && data.length > 0) {
-            setCartItems(data)
-            setSelectedIds(new Set<string>(data.map((item: any) => String(item.id))))
+    try {
+        // 🌟 FORTRESS DATA SYNCHRONIZER: Fetch freshest inventory from DB 🌟
+        const { data: freshProducts, error } = await supabase.from('products').select('*')
+        if (error) throw error
+
+        const localCart = JSON.parse(localStorage.getItem('cart') || '[]')
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        let initialCart = [];
+
+        if (localCart.length > 0) {
+            initialCart = localCart;
+        } else if (session) {
+            const { data } = await supabase.from('cart').select('*').eq('user_id', session.user.id)
+            if (data && data.length > 0) {
+                initialCart = data;
+            }
         }
+
+        // 🌟 Sync local cart with fresh DB data to catch "is_sold_out" status 🌟
+        if (initialCart.length > 0 && freshProducts) {
+            const syncedCart = initialCart.map((item: any) => {
+                const freshData = freshProducts.find(p => p.id === item.id) || item;
+                return { ...item, ...freshData }; // Override local with fresh data
+            });
+
+            setCartItems(syncedCart)
+            localStorage.setItem('cart', JSON.stringify(syncedCart)); // Update local storage with fresh data
+
+            // Only auto-select items that are NOT sold out
+            const validIds = new Set<string>(
+                syncedCart.filter((item: any) => !item.is_sold_out).map((item: any) => String(item.id))
+            )
+            setSelectedIds(validIds)
+        }
+    } catch (err) {
+        console.error("Cart Sync Error:", err);
     }
     setLoading(false)
   }
@@ -47,7 +69,9 @@ export default function CartPage() {
       if (session) await supabase.from('cart').update({ quantity: newQty }).eq('id', id)
   }
 
-  const toggleItem = (id: string) => {
+  const toggleItem = (id: string, isSoldOut: boolean) => {
+      if (isSoldOut) return; // Prevent selecting sold out items
+      
       const idStr = String(id)
       const newSelected = new Set(selectedIds)
       if (newSelected.has(idStr)) newSelected.delete(idStr)
@@ -56,8 +80,14 @@ export default function CartPage() {
   }
 
   const toggleAll = () => {
-      if (selectedIds.size === cartItems.length) setSelectedIds(new Set())
-      else setSelectedIds(new Set(cartItems.map(i => String(i.id))))
+      // Only count available items
+      const availableItems = cartItems.filter(i => !i.is_sold_out);
+      
+      if (selectedIds.size === availableItems.length) {
+          setSelectedIds(new Set())
+      } else {
+          setSelectedIds(new Set(availableItems.map(i => String(i.id))))
+      }
   }
 
   const removeItem = async (e: any, id: string) => {
@@ -79,7 +109,10 @@ export default function CartPage() {
       router.push(`/checkout?ids=${idsParam}`)
   }
 
-  const selectedTotal = cartItems.filter(item => selectedIds.has(String(item.id))).reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0)
+  const selectedTotal = cartItems.filter(item => selectedIds.has(String(item.id)) && !item.is_sold_out).reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0)
+  
+  // Count only available items for the "Select All" toggle logic
+  const availableItemsCount = cartItems.filter(i => !i.is_sold_out).length;
 
   if (loading) return <div className="min-h-screen bg-[#1a0505] flex items-center justify-center text-[#c5a059] font-serif">Loading...</div>
 
@@ -105,8 +138,12 @@ export default function CartPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
                     <div className="lg:col-span-2 space-y-4">
                         <div className="flex items-center gap-4 border-b border-[#e5d5a3]/10 pb-4 mb-6">
-                            <button onClick={toggleAll} className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${selectedIds.size === cartItems.length ? 'bg-[#c5a059] border-[#c5a059] text-[#1a0505]' : 'border-[#e5d5a3]/50 bg-transparent'}`}>
-                                {selectedIds.size === cartItems.length && <CheckIcon />}
+                            <button 
+                                onClick={toggleAll} 
+                                disabled={availableItemsCount === 0}
+                                className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${availableItemsCount === 0 ? 'border-[#e5d5a3]/10 bg-[#1a0505] cursor-not-allowed' : selectedIds.size === availableItemsCount ? 'bg-[#c5a059] border-[#c5a059] text-[#1a0505]' : 'border-[#e5d5a3]/50 bg-transparent'}`}
+                            >
+                                {(selectedIds.size === availableItemsCount && availableItemsCount > 0) && <CheckIcon />}
                             </button>
                             <span className="text-xs uppercase tracking-widest text-[#e5d5a3]/70 font-bold">Select All</span>
                         </div>
@@ -116,29 +153,43 @@ export default function CartPage() {
                             return (
                                 <div 
                                     key={item.id} 
-                                    // 🌟 CLICK ANYWHERE TO TOGGLE SELECTION 🌟
-                                    onClick={() => toggleItem(item.id)}
-                                    className={`flex gap-6 p-4 rounded border transition-all cursor-pointer bg-[#2a0808] ${isSelected ? 'border-[#c5a059]/50 shadow-[0_0_15px_rgba(197,160,89,0.05)]' : 'border-[#e5d5a3]/10 hover:border-[#e5d5a3]/30'}`}
+                                    // 🌟 CLICK ANYWHERE TO TOGGLE SELECTION (IF NOT SOLD OUT) 🌟
+                                    onClick={() => toggleItem(item.id, item.is_sold_out)}
+                                    className={`flex gap-6 p-4 rounded border transition-all bg-[#2a0808] ${item.is_sold_out ? 'opacity-60 cursor-not-allowed border-[#e5d5a3]/5' : isSelected ? 'border-[#c5a059]/50 shadow-[0_0_15px_rgba(197,160,89,0.05)] cursor-pointer' : 'border-[#e5d5a3]/10 hover:border-[#e5d5a3]/30 cursor-pointer'}`}
                                 >
-                                    <div className={`w-5 h-5 mt-auto mb-auto rounded border flex items-center justify-center transition-all flex-shrink-0 ${isSelected ? 'bg-[#c5a059] border-[#c5a059] text-[#1a0505]' : 'border-[#e5d5a3]/50 bg-transparent'}`}>
-                                        {isSelected && <CheckIcon />}
+                                    <div className={`w-5 h-5 mt-auto mb-auto rounded border flex items-center justify-center transition-all flex-shrink-0 ${item.is_sold_out ? 'border-[#e5d5a3]/10 bg-[#1a0505]' : isSelected ? 'bg-[#c5a059] border-[#c5a059] text-[#1a0505]' : 'border-[#e5d5a3]/50 bg-transparent'}`}>
+                                        {isSelected && !item.is_sold_out && <CheckIcon />}
                                     </div>
-                                    <div className="h-24 w-24 bg-[#1a0505] rounded overflow-hidden flex-shrink-0 border border-[#e5d5a3]/10">
-                                        <img src={item.image_url} className="h-full w-full object-cover" />
+                                    <div className="h-24 w-24 bg-[#1a0505] rounded overflow-hidden flex-shrink-0 border border-[#e5d5a3]/10 relative">
+                                        <img src={item.image_url} className={`h-full w-full object-cover ${item.is_sold_out ? 'grayscale opacity-70' : ''}`} />
+                                        {item.is_sold_out && (
+                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                <div className="w-full bg-[#1a0505]/80 py-1 flex justify-center">
+                                                    <span className="text-[#c5a059] text-[8px] font-bold uppercase tracking-widest">Sold Out</span>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="flex-1 flex justify-between items-center">
                                         <div className="flex flex-col justify-between h-full py-1">
-                                            <h3 className="font-serif text-lg text-[#f4e4bc]">{item.name}</h3>
-                                            <div className="flex items-center gap-4 mt-2">
-                                                <div className="flex items-center border border-[#e5d5a3]/20 rounded bg-[#1a0505]" onClick={(e) => e.stopPropagation()}>
-                                                    <button onClick={(e) => updateQuantity(e, item.id, (item.quantity || 1) - 1)} className="px-2 py-1 text-[#c5a059] hover:bg-[#e5d5a3]/10 text-xs">-</button>
-                                                    <span className="text-xs text-[#e5d5a3] px-2 font-mono">{item.quantity || 1}</span>
-                                                    <button onClick={(e) => updateQuantity(e, item.id, (item.quantity || 1) + 1)} className="px-2 py-1 text-[#c5a059] hover:bg-[#e5d5a3]/10 text-xs">+</button>
+                                            <h3 className={`font-serif text-lg ${item.is_sold_out ? 'text-[#e5d5a3]/70 line-through' : 'text-[#f4e4bc]'}`}>{item.name}</h3>
+                                            
+                                            {item.is_sold_out ? (
+                                                <div className="mt-2 inline-block bg-red-900/30 border border-red-500/30 text-red-400 text-[10px] px-2 py-1 rounded uppercase tracking-widest font-bold w-fit">
+                                                    Out of Stock
                                                 </div>
-                                            </div>
+                                            ) : (
+                                                <div className="flex items-center gap-4 mt-2">
+                                                    <div className="flex items-center border border-[#e5d5a3]/20 rounded bg-[#1a0505]" onClick={(e) => e.stopPropagation()}>
+                                                        <button onClick={(e) => updateQuantity(e, item.id, (item.quantity || 1) - 1)} className="px-2 py-1 text-[#c5a059] hover:bg-[#e5d5a3]/10 text-xs">-</button>
+                                                        <span className="text-xs text-[#e5d5a3] px-2 font-mono">{item.quantity || 1}</span>
+                                                        <button onClick={(e) => updateQuantity(e, item.id, (item.quantity || 1) + 1)} className="px-2 py-1 text-[#c5a059] hover:bg-[#e5d5a3]/10 text-xs">+</button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex flex-col items-end gap-3 h-full justify-center">
-                                            <p className="font-bold text-[#c5a059] text-xl">₹{item.price.toLocaleString("en-IN")}</p>
+                                            <p className={`font-bold text-xl ${item.is_sold_out ? 'text-[#c5a059]/50' : 'text-[#c5a059]'}`}>₹{item.price.toLocaleString("en-IN")}</p>
                                             <button onClick={(e) => removeItem(e, item.id)} className="text-[#e5d5a3]/30 hover:text-red-500 transition-colors text-xs flex items-center gap-1">
                                                 <TrashIcon /> <span className="hidden md:inline">Remove</span>
                                             </button>
@@ -153,7 +204,7 @@ export default function CartPage() {
                             <h3 className="font-serif text-xl text-[#f4e4bc] mb-6">Summary</h3>
                             <div className="flex justify-between mb-3 text-sm text-[#e5d5a3]/70"><span>Selected</span><span>{selectedIds.size} Items</span></div>
                             <div className="flex justify-between mb-8 text-2xl font-serif text-[#c5a059] pt-4 border-t border-[#e5d5a3]/10"><span>Total</span><span>₹{selectedTotal.toLocaleString("en-IN")}</span></div>
-                            <button onClick={handleCheckout} disabled={selectedIds.size === 0} className={`w-full py-4 rounded font-bold uppercase tracking-widest text-xs transition-all shadow-lg ${selectedIds.size > 0 ? 'bg-[#c5a059] text-[#1a0505] hover:bg-white' : 'bg-[#e5d5a3]/10 text-[#e5d5a3]/30 cursor-not-allowed'}`}>Checkout & Pay</button>
+                            <button onClick={handleCheckout} disabled={selectedIds.size === 0} className={`w-full py-4 rounded font-bold uppercase tracking-widest text-xs transition-all shadow-lg ${selectedIds.size > 0 ? 'bg-[#c5a059] text-[#1a0505] hover:bg-white' : 'bg-[#e5d5a3]/10 text-[#e5d5a3]/30 cursor-not-allowed shadow-none'}`}>Checkout & Pay</button>
                         </div>
                     </div>
                 </div>
