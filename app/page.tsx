@@ -9,6 +9,20 @@ import { useRouter } from 'next/navigation'
 // 1. CONFIGURATION
 import { supabase } from '@/app/supabase'
 
+// 🌟 HERO BANNER DATA (JIOHOTSTAR STYLE) 🌟
+// Currently set to 1 banner as requested. Add more here later to activate the switcher!
+const HERO_BANNERS = [
+    {
+        tag: "Imitation Fine Jewelry",
+        titlePrefix: "Heritage Craftsmanship. ",
+        titleHighlight: "Uncompromising",
+        titleSuffix: " Elegance.",
+        desc: "Discover our exclusive collection of royal Indian designs, meticulously crafted to mirror the exact grandeur of solid gold.",
+        btn: "Shop Collection",
+        img: "https://fwyliqsazdyprlkemavu.supabase.co/storage/v1/object/public/jewelry-images/banner.jpg"
+    }
+]
+
 // 🌟 MEGA MENU DATA STRUCTURE
 const MEGA_MENU = [
     {
@@ -217,6 +231,35 @@ export default function Page() {
 
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null)
 
+  // 🌟 HOTSTAR BANNER LOGIC 🌟
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0)
+
+  // Auto-scroll the hero banner every 5 seconds
+  useEffect(() => {
+      const timer = setInterval(() => {
+          setCurrentBannerIndex((prev) => (prev + 1) % HERO_BANNERS.length);
+      }, 5000);
+      return () => clearInterval(timer);
+  }, []);
+
+  // 🌟 FEATURED TREASURES FILTER STATE 🌟
+  const [activeFilter, setActiveFilter] = useState('Featured Items')
+
+  // 🌟 DYNAMIC FILTER & SORT LOGIC (MAX 40 ITEMS) 🌟
+  const displayedProducts = [...products].sort((a, b) => {
+      if (activeFilter === 'Newest Arrivals') {
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      }
+      if (activeFilter === 'Hottest selling') {
+          // Fallback logic for demo purposes (e.g. price descending or an actual best_seller flag)
+          return (b.price || 0) - (a.price || 0); 
+      }
+      if (activeFilter === 'Highest Rated') {
+          return (b.rating || 5) - (a.rating || 5);
+      }
+      return 0; // 'Featured Items' (Default DB order)
+  }).slice(0, 40);
+
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
@@ -262,7 +305,6 @@ export default function Page() {
   useEffect(() => {
     async function init() {
         try {
-            // 1. Directly fetch from Supabase to bypass Next.js API caching entirely
             const { data: freshProducts, error } = await supabase.from('products').select('*');
             
             if (error) {
@@ -271,30 +313,27 @@ export default function Page() {
             }
 
             if (freshProducts) {
-                // Update Homepage Grid
                 setProducts(freshProducts);
 
-                // 2. Sync Cart LocalStorage with Fresh DB Data
                 const rawCart = JSON.parse(localStorage.getItem('cart') || '[]');
                 const cleanCart: any[] = [];
                 rawCart.forEach((item: any) => {
-                    const freshData = freshProducts.find(p => p.id === item.id) || item; // Get fresh is_sold_out status
+                    const freshData = freshProducts.find(p => p.id === item.id) || item; 
                     const existing = cleanCart.find(i => i.id === item.id);
                     const qty = (item.quantity !== undefined && !isNaN(item.quantity)) ? item.quantity : 1;
                     if (existing) { 
                         existing.quantity += qty;
                     } else { 
-                        cleanCart.push({ ...item, ...freshData, quantity: qty }); // Override stale local data
+                        cleanCart.push({ ...item, ...freshData, quantity: qty }); 
                     }
                 });
                 localStorage.setItem('cart', JSON.stringify(cleanCart)); 
                 setCart(cleanCart);
                 
-                // 3. Sync Wishlist LocalStorage with Fresh DB Data
                 const rawWishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
                 const cleanWishlist = rawWishlist.map((item: any) => {
                     const freshData = freshProducts.find(p => p.id === item.id) || item;
-                    return { ...item, ...freshData }; // Override stale local data
+                    return { ...item, ...freshData }; 
                 });
                 setWishlist(cleanWishlist);
                 localStorage.setItem('wishlist', JSON.stringify(cleanWishlist));
@@ -327,7 +366,6 @@ export default function Page() {
 
   const toggleWishlist = (product: any) => { const exists = wishlist.find(i => i.id === product.id); let newW; if(exists) newW = wishlist.filter(i=>i.id!==product.id); else newW=[...wishlist, product]; setWishlist(newW); localStorage.setItem('wishlist', JSON.stringify(newW)) }
   
-  // 🌟 FIX: Only calculate total for items that are NOT sold out 🌟
   const cartTotal = cart.filter(i => !i.is_sold_out).reduce((t, i) => t + (i.price * (i.quantity || 1)), 0)
   
   const scrollTo = (id: string) => { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); setMobileMenuOpen(false) }
@@ -346,6 +384,10 @@ export default function Page() {
         .animate-fade-up-stagger {
           animation: fadeUpStagger 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           opacity: 0;
+        }
+        @keyframes loadingBar {
+          0% { width: 0%; }
+          100% { width: 100%; }
         }
       `}} />
 
@@ -502,7 +544,6 @@ export default function Page() {
                               <h4 className="font-serif text-sm text-[#e5d5a3] leading-tight">{item.name}</h4>
                               <p className="text-xs text-[#c5a059] mt-1 font-bold">₹{item.price.toLocaleString("en-IN")}</p>
                           </div>
-                          {/* 🌟 FIX: CART SIDEBAR SOLD OUT LOGIC 🌟 */}
                           {item.is_sold_out ? (
                               <div className="mt-2 inline-block bg-red-900/30 border border-red-500/30 text-red-400 text-[10px] px-2 py-1 rounded uppercase tracking-widest font-bold w-fit">
                                   Out of Stock
@@ -525,36 +566,93 @@ export default function Page() {
           </div>
       </div>
 
-      <section id="hero" className="relative overflow-hidden bg-[#1a0505] py-24 lg:py-40 border-b border-[#e5d5a3]/10">
-        <div className="absolute inset-0 z-0">
-            <img src="https://fwyliqsazdyprlkemavu.supabase.co/storage/v1/object/public/jewelry-images/banner.jpg" alt="Royal Jewelry Background" className="h-full w-full object-cover opacity-40" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#1a0505] via-[#2a0808]/60 to-[#1a0505]/30" />
-        </div>
-        <div className="relative mx-auto flex max-w-7xl flex-col items-center text-center px-6 lg:px-8 z-10">
-          <span className="mb-6 inline-block border border-[#c5a059]/60 px-6 py-2 font-sans text-xs font-bold uppercase tracking-[0.3em] text-[#c5a059] drop-shadow-md rounded animate-hero-1">
-              Imitation Fine Jewelry
-          </span>
-          <h1 className="max-w-6xl font-serif text-5xl font-medium leading-tight tracking-wide text-[#f4e4bc] md:text-6xl lg:text-7xl drop-shadow-lg animate-hero-2">
-              Heritage Craftsmanship. <span className="text-[#c5a059] italic">Uncompromising</span> Elegance.
-          </h1>
-          <p className="mt-8 max-w-xl font-sans text-sm leading-relaxed text-[#e5d5a3]/90 md:text-base drop-shadow-md animate-hero-3">
-              Discover our exclusive collection of royal Indian designs, meticulously crafted to mirror the exact grandeur of solid gold.
-          </p>
-          <div className="mt-12 flex flex-col sm:flex-row gap-4 animate-hero-btn">
-              <button onClick={() => scrollTo('featured')} className="inline-flex items-center justify-center gap-2 bg-transparent border border-[#c5a059] px-10 py-4 font-sans text-xs font-bold uppercase tracking-[0.2em] text-[#c5a059] transition-all hover:bg-[#c5a059] hover:text-[#1a0505] hover:shadow-[0_0_20px_rgba(197,160,89,0.3)] cursor-pointer rounded">
-                  Shop Collection
-              </button>
-          </div>
+      {/* 🌟 JIOHOTSTAR STYLE HERO CAROUSEL 🌟 */}
+      <section id="hero" className="relative overflow-hidden bg-[#1a0505] min-h-[600px] lg:min-h-[800px] border-b border-[#e5d5a3]/10 flex items-center justify-center">
+        
+        {/* Render all banners, fade between them based on currentBannerIndex */}
+        {HERO_BANNERS.map((banner, idx) => (
+            <div 
+                key={idx} 
+                className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${currentBannerIndex === idx ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+            >
+                <div className="absolute inset-0 z-0">
+                    <img src={banner.img} alt="Royal Jewelry Background" className="h-full w-full object-cover opacity-40" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#1a0505] via-[#2a0808]/60 to-[#1a0505]/30" />
+                </div>
+                
+                <div className="relative mx-auto flex max-w-7xl flex-col items-center text-center px-6 lg:px-8 z-10 h-full justify-center pt-32 lg:pt-40">
+                    <span className={`mb-6 inline-block border border-[#c5a059]/60 px-6 py-2 font-sans text-xs font-bold uppercase tracking-[0.3em] text-[#c5a059] drop-shadow-md rounded ${currentBannerIndex === idx ? 'animate-hero-1' : ''}`}>
+                        {banner.tag}
+                    </span>
+                    <h1 className={`max-w-6xl font-serif text-5xl font-medium leading-tight tracking-wide text-[#f4e4bc] md:text-6xl lg:text-7xl drop-shadow-lg ${currentBannerIndex === idx ? 'animate-hero-2' : ''}`}>
+                        {banner.titlePrefix} <span className="text-[#c5a059] italic">{banner.titleHighlight}</span> {banner.titleSuffix}
+                    </h1>
+                    <p className={`mt-8 max-w-xl font-sans text-sm leading-relaxed text-[#e5d5a3]/90 md:text-base drop-shadow-md ${currentBannerIndex === idx ? 'animate-hero-3' : ''}`}>
+                        {banner.desc}
+                    </p>
+                    <div className={`mt-12 flex flex-col sm:flex-row gap-4 ${currentBannerIndex === idx ? 'animate-hero-btn' : ''}`}>
+                        {/* 🌟 FIX: Preserved original scrollTo('featured') action per instructions 🌟 */}
+                        <button onClick={() => scrollTo('featured')} className="inline-flex items-center justify-center gap-2 bg-transparent border border-[#c5a059] px-10 py-4 font-sans text-xs font-bold uppercase tracking-[0.2em] text-[#c5a059] transition-all hover:bg-[#c5a059] hover:text-[#1a0505] hover:shadow-[0_0_20px_rgba(197,160,89,0.3)] cursor-pointer rounded">
+                            {banner.btn}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        ))}
+
+        {/* 🌟 JIOHOTSTAR BOTTOM-RIGHT THUMBNAIL CONTROLS (Will only show 1 for now) 🌟 */}
+        <div className="absolute bottom-6 right-6 lg:bottom-12 lg:right-12 z-30 flex items-center gap-2 bg-[#1a0505]/80 backdrop-blur-md p-2 rounded border border-[#e5d5a3]/10 shadow-2xl">
+            {HERO_BANNERS.map((banner, idx) => (
+                <button
+                    key={idx}
+                    onClick={() => setCurrentBannerIndex(idx)}
+                    className={`relative h-12 w-20 lg:h-16 lg:w-28 overflow-hidden rounded border transition-all duration-300 ${
+                        currentBannerIndex === idx 
+                        ? 'border-[#c5a059] opacity-100 shadow-[0_0_15px_rgba(197,160,89,0.5)]' 
+                        : 'border-transparent opacity-40 hover:opacity-100'
+                    }`}
+                >
+                    <img src={banner.img} className="absolute inset-0 w-full h-full object-cover" />
+                    
+                    {/* Animated Progress Bar on Active Thumbnail */}
+                    {currentBannerIndex === idx && (
+                        <div className="absolute bottom-0 left-0 h-1 bg-[#c5a059] animate-[loadingBar_5s_linear_infinite]"></div>
+                    )}
+                </button>
+            ))}
         </div>
       </section>
 
+      {/* 🌟 FIX: RESTORED ORIGINAL GRID LAYOUT WITH NEW FILTER PILLS 🌟 */}
       <section id="featured" className="py-24 px-4 max-w-7xl mx-auto reveal-on-scroll">
-        <div className="mb-20 text-center"><span className="mb-3 inline-block font-sans text-xs font-bold uppercase tracking-[0.3em] text-[#e5d5a3]/40">Curated for You</span><h2 className="font-serif text-4xl font-medium tracking-wide text-[#f4e4bc]">Featured Treasures</h2><div className="mx-auto mt-6 h-px w-24 bg-gradient-to-r from-transparent via-[#c5a059] to-transparent" /></div>
+        <div className="mb-16 text-center">
+            <span className="mb-3 inline-block font-sans text-xs font-bold uppercase tracking-[0.3em] text-[#e5d5a3]/40">Curated for You</span>
+            <h2 className="font-serif text-4xl font-medium tracking-wide text-[#f4e4bc] mb-8">Featured Treasures</h2>
+            
+            {/* 🌟 NEW: FILTER PILLS ABOVE THE GRID 🌟 */}
+            <div className="flex flex-wrap justify-center gap-3">
+                {['Featured Items', 'Newest Arrivals', 'Hottest selling', 'Highest Rated'].map(filter => (
+                    <button 
+                        key={filter}
+                        onClick={() => setActiveFilter(filter)}
+                        className={`px-6 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${
+                            activeFilter === filter 
+                            ? 'bg-[#c5a059] text-[#1a0505] shadow-[0_0_15px_rgba(197,160,89,0.3)]' 
+                            : 'bg-[#2a0808] border border-[#e5d5a3]/20 text-[#e5d5a3]/70 hover:border-[#c5a059]/50 hover:text-[#e5d5a3]'
+                        }`}
+                    >
+                        {filter}
+                    </button>
+                ))}
+            </div>
+            <div className="mx-auto mt-10 h-px w-24 bg-gradient-to-r from-transparent via-[#c5a059] to-transparent" />
+        </div>
+
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {products.length === 0 ? (
                 <div className="col-span-4 py-20 text-center border border-dashed border-[#e5d5a3]/20 rounded bg-[#2a0808]/50"><p className="text-[#e5d5a3]/50 font-serif text-lg">Loading your collection...</p></div>
             ) : (
-                products.map((product, index) => (<ProductCard key={product.id} index={index} product={product} onAddToCart={addToCart} isWishlisted={wishlist.some(item => item.id === product.id)} onToggleWishlist={toggleWishlist} />))
+                displayedProducts.map((product, index) => (<ProductCard key={product.id} index={index} product={product} onAddToCart={addToCart} isWishlisted={wishlist.some(item => item.id === product.id)} onToggleWishlist={toggleWishlist} />))
             )}
         </div>
         <div className="mt-20 text-center"><button onClick={() => scrollTo('featured')} className="text-[#e5d5a3] border-b border-[#e5d5a3]/30 pb-1 hover:text-white hover:border-[#e5d5a3] transition-all text-sm uppercase tracking-widest">View All Products</button></div>

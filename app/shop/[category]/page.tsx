@@ -137,6 +137,8 @@ export default function CategoryPage() {
   // Filter & Sort States
   const [sortOrder, setSortOrder] = useState('newest') 
   const [priceRange, setPriceRange] = useState('all') 
+  // 🌟 NEW: Add rating filter state
+  const [minRating, setMinRating] = useState(0) 
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false)
 
   const [cart, setCart] = useState<any[]>([])
@@ -226,7 +228,7 @@ export default function CategoryPage() {
         setWishlist(storedWishlist)
     }
     init()
-  }, [category, searchQuery, sourceId, originalCat, isFallback, modelTag]) // 🚀 Added modelTag to dependencies
+  }, [category, searchQuery, sourceId, originalCat, isFallback, modelTag]) 
 
   // 2. Filter Engine
   useEffect(() => {
@@ -238,9 +240,16 @@ export default function CategoryPage() {
       else if (priceRange === '500-1500') result = result.filter(p => p.price >= 500 && p.price <= 1500);
       else if (priceRange === 'over-1500') result = result.filter(p => p.price > 1500);
 
+      // 🌟 NEW: Apply Rating Filter (Assume default 5 if null in DB)
+      if (minRating > 0) {
+          result = result.filter(p => (p.rating || 5) >= minRating);
+      }
+
       // Apply Sort
       if (sortOrder === 'price-asc') result.sort((a, b) => a.price - b.price);
       else if (sortOrder === 'price-desc') result.sort((a, b) => b.price - a.price);
+      // 🌟 NEW: Highest Rated Sorting
+      else if (sortOrder === 'highest-rated') result.sort((a, b) => (b.rating || 5) - (a.rating || 5));
       else if (sortOrder === 'newest') {
           // If we are strictly in 'recommendations' mode, do NOT resort by newest. Keep the mathematical AI order!
           if (category !== 'recommendations') {
@@ -256,7 +265,7 @@ export default function CategoryPage() {
           setIsFiltering(false)
       }, 50)
 
-  }, [products, sortOrder, priceRange, category]);
+  }, [products, sortOrder, priceRange, minRating, category]); // Added minRating dependency
 
 
   useEffect(() => {
@@ -477,8 +486,8 @@ export default function CategoryPage() {
                 
                 <div className="flex justify-between items-center mb-8 border-b border-[#e5d5a3]/10 pb-4">
                     <h3 className="font-serif text-xl text-[#f4e4bc] tracking-wide">Filters</h3>
-                    {(priceRange !== 'all' || sortOrder !== 'newest') && (
-                        <button onClick={() => {setPriceRange('all'); setSortOrder('newest')}} className="text-[10px] text-[#c5a059] hover:text-white transition-colors uppercase tracking-widest font-bold">Clear All</button>
+                    {(priceRange !== 'all' || sortOrder !== 'newest' || minRating > 0) && (
+                        <button onClick={() => {setPriceRange('all'); setSortOrder('newest'); setMinRating(0);}} className="text-[10px] text-[#c5a059] hover:text-white transition-colors uppercase tracking-widest font-bold">Clear All</button>
                     )}
                 </div>
 
@@ -493,6 +502,8 @@ export default function CategoryPage() {
                             className="w-full bg-[#1a0505] border border-[#e5d5a3]/20 p-3.5 rounded-lg text-sm text-[#e5d5a3] outline-none focus:border-[#c5a059] focus:shadow-[0_0_10px_rgba(197,160,89,0.2)] cursor-pointer appearance-none transition-all"
                         >
                             <option value="newest">Newest Arrivals</option>
+                            {/* 🌟 NEW: Highest Rated Sorting Option */}
+                            <option value="highest-rated">Highest Rated</option>
                             <option value="price-asc">Price: Low to High</option>
                             <option value="price-desc">Price: High to Low</option>
                         </select>
@@ -520,6 +531,30 @@ export default function CategoryPage() {
                                     <div className={`w-2 h-2 rounded-full bg-[#c5a059] transition-transform duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) ${priceRange === range.id ? 'scale-100' : 'scale-0'}`}></div>
                                 </div>
                                 <span className={`text-sm transition-colors duration-300 ${priceRange === range.id ? 'text-[#f4e4bc] font-medium' : 'text-[#e5d5a3]/70 group-hover:text-[#e5d5a3]'}`}>{range.label}</span>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+
+                {/* 🌟 NEW: Customer Rating Filter */}
+                <div>
+                    <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#e5d5a3]/50 mb-5 flex items-center gap-2 mt-10">
+                        Customer Rating <span className="h-px bg-[#e5d5a3]/10 flex-1"></span>
+                    </h4>
+                    <div className="flex flex-col gap-4">
+                        {[
+                            { id: 0, label: 'All Ratings' },
+                            { id: 4, label: '4★ & Above' },
+                        ].map((range) => (
+                            <label 
+                                key={range.id} 
+                                className="flex items-center gap-4 cursor-pointer group"
+                                onClick={() => setMinRating(range.id)} 
+                            >
+                                <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all duration-300 ${minRating === range.id ? 'border-[#c5a059] shadow-[0_0_8px_rgba(197,160,89,0.4)]' : 'border-[#e5d5a3]/30 group-hover:border-[#e5d5a3]/80'}`}>
+                                    <div className={`w-2 h-2 rounded-full bg-[#c5a059] transition-transform duration-300 cubic-bezier(0.34, 1.56, 0.64, 1) ${minRating === range.id ? 'scale-100' : 'scale-0'}`}></div>
+                                </div>
+                                <span className={`text-sm transition-colors duration-300 ${minRating === range.id ? 'text-[#f4e4bc] font-medium' : 'text-[#e5d5a3]/70 group-hover:text-[#e5d5a3]'}`}>{range.label}</span>
                             </label>
                         ))}
                     </div>
@@ -557,6 +592,20 @@ export default function CategoryPage() {
                             </button>
                         </div>
                     )}
+
+                    {/* 🌟 NEW: Dynamic Rating Pill */}
+                    {minRating > 0 && (
+                        <div className="bg-[#c5a059]/10 border border-[#c5a059]/40 pl-4 pr-1.5 py-1 rounded-full text-xs text-[#c5a059] flex items-center gap-2 animate-fade-in shadow-[0_0_15px_rgba(197,160,89,0.05)]">
+                            <span className="font-medium tracking-wide">4★ & Above</span>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); setMinRating(0); }} 
+                                className="hover:bg-[#c5a059]/20 p-1.5 rounded-full transition-all duration-300 hover:rotate-90 cursor-pointer active:scale-90"
+                                aria-label="Remove filter"
+                            >
+                                <XIcon className="h-3 w-3" />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -568,7 +617,7 @@ export default function CategoryPage() {
                             <SearchIcon className="h-8 w-8" />
                         </div>
                         <p className="text-[#e5d5a3]/60 font-serif text-xl max-w-md">No royal treasures found matching your refined taste.</p>
-                        <button onClick={() => {setPriceRange('all'); setSortOrder('newest')}} className="bg-[#e5d5a3] px-8 py-3.5 font-sans text-xs font-bold uppercase tracking-widest text-[#1a0505] hover:bg-white transition-all rounded shadow-lg hover:shadow-[0_0_20px_rgba(229,213,163,0.3)] animate-pulse-glow mt-4">
+                        <button onClick={() => {setPriceRange('all'); setSortOrder('newest'); setMinRating(0);}} className="bg-[#e5d5a3] px-8 py-3.5 font-sans text-xs font-bold uppercase tracking-widest text-[#1a0505] hover:bg-white transition-all rounded shadow-lg hover:shadow-[0_0_20px_rgba(229,213,163,0.3)] animate-pulse-glow mt-4">
                             Clear Filters
                         </button>
                     </div>
