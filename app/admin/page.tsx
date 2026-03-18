@@ -8,7 +8,9 @@ import RevenueChart from './chart/RevenueChart'
 export const dynamic = 'force-dynamic'
 
 import { supabase } from '@/app/supabase'
-const MY_ADMIN_EMAIL = "lahareshab@gmail.com" 
+
+// 🌟 ENTERPRISE SECURITY UPGRADE: Looks for hidden env variable first, falls back to your email 🌟
+const MY_ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "lahareshab@gmail.com" 
 
 // ICONS
 function WarningIcon({ className="h-12 w-12" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg> }
@@ -431,13 +433,17 @@ function AdminContent() {
           <div className="flex gap-4 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
               {!isHistoryMode && (
                   <Link href="/admin/upload" className="shrink-0 bg-[#c5a059] text-[#1a0505] px-6 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-white transition-all shadow-[0_0_15px_rgba(197,160,89,0.3)] flex items-center gap-2">
-                      <PlusIcon /> Add Product
+                      <PlusIcon className="h-4 w-4" /> Add Product
                   </Link>
               )}
               
-              {/* 🔥 NEW FEATURE: ALL PRODUCTS BUTTON 🔥 */}
               <Link href="/admin/products" className="shrink-0 bg-[#1a0505] border border-[#e5d5a3]/30 text-[#e5d5a3] px-6 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-[#e5d5a3] hover:text-[#1a0505] transition-all flex items-center">
                   All Products
+              </Link>
+
+              {/* 🌟 THE FIX: Button points to the exact banner folder you made! 🌟 */}
+              <Link href="/admin/banner" className="shrink-0 bg-[#1a0505] border border-[#e5d5a3]/30 text-[#e5d5a3] px-6 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-[#e5d5a3] hover:text-[#1a0505] transition-all flex items-center">
+                  Manage Banners
               </Link>
 
               {isHistoryMode && (

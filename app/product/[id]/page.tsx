@@ -27,6 +27,12 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, rec
   const [imgLoaded, setImgLoaded] = useState(false)
   const [isGlittering, setIsGlittering] = useState(false)
 
+  // 🌟 NEW: Calculate Discounted Price for Recommendation Cards 🌟
+  const hasDiscount = product.discount_percentage && product.discount_percentage > 0;
+  const finalPrice = hasDiscount 
+      ? Math.round(product.price - (product.price * (product.discount_percentage / 100))) 
+      : product.price;
+
   const trackInteraction = (eventType: string) => {
       let sessionId = "unknown";
       if (typeof window !== "undefined") {
@@ -60,7 +66,6 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, rec
       <div className={`relative aspect-[3/4] overflow-hidden bg-[#1a0505] flex items-center justify-center rounded-t ${product.is_sold_out ? 'cursor-default' : 'group cursor-pointer'}`}>
         <Link href={`/product/${product.id}?ref=${recommendationModel}`} className="absolute inset-0 z-0" onClick={() => trackInteraction('view')}>
             
-            {/* 🌟 FIX: DEDICATED WRAPPER FOR GRAYSCALE TO PREVENT CSS CONFLICTS 🌟 */}
             <div className={`absolute inset-0 ${product.is_sold_out ? 'grayscale opacity-50' : ''}`}>
                 {product.image_url ? 
                     <img src={product.image_url} alt={product.name} onLoad={() => setImgLoaded(true)} className={`h-full w-full object-cover transition-transform duration-500 ${!product.is_sold_out ? 'group-hover:scale-110' : ''} ${imgLoaded ? 'image-loaded' : 'image-loading'}`} /> 
@@ -69,7 +74,14 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, rec
                 }
             </div>
             
-            {/* 🌟 ELITE SOLD OUT OVERLAY (CAROUSEL) 🌟 */}
+            {/* 🌟 DISCOUNT BADGE (Recommendation Cards) 🌟 */}
+            {hasDiscount && !product.is_sold_out && (
+                <span className="absolute left-3 top-3 bg-red-600/90 backdrop-blur-sm border border-red-500/50 px-2 py-1 font-sans text-[9px] font-bold uppercase text-white rounded-sm z-10 shadow-lg tracking-wider">
+                    {product.discount_percentage}% OFF
+                </span>
+            )}
+
+            {/* 🌟 ELITE SOLD OUT OVERLAY 🌟 */}
             {product.is_sold_out && (
                 <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
                     <div className="w-full bg-[#1a0505]/80 border-y border-[#c5a059]/30 py-3 flex justify-center shadow-lg">
@@ -112,7 +124,12 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, rec
         <Link href={`/product/${product.id}?ref=${recommendationModel}`} className="hover:text-white transition-colors" onClick={() => trackInteraction('view')}>
             <h3 className="font-serif text-lg font-medium tracking-wide text-[#e5d5a3] line-clamp-1">{product.name}</h3>
         </Link>
-        <p className="font-sans text-base font-bold text-white/80">₹{product.price.toLocaleString("en-IN")}</p>
+        <div className="flex items-center gap-2">
+            <p className="font-sans text-base font-bold text-white/80">₹{finalPrice.toLocaleString("en-IN")}</p>
+            {hasDiscount && (
+                <p className="font-sans text-[10px] text-[#e5d5a3]/40 line-through">₹{product.price.toLocaleString("en-IN")}</p>
+            )}
+        </div>
       </div>
     </article>
   )
@@ -199,7 +216,7 @@ export default function ProductPage() {
           currentUser = session.user;
       }
 
-      // Fetch product including is_sold_out
+      // Fetch product including is_sold_out and discount_percentage
       const { data: mainProduct } = await supabase.from('products').select('*').eq('id', params.id).single()
       setProduct(mainProduct)
 
@@ -339,11 +356,20 @@ export default function ProductPage() {
       setAnimKey(prev => prev + 1)
   }
 
+  // 🌟 NEW: Calculate final price for the main product safely
+  const hasDiscount = product?.discount_percentage && product.discount_percentage > 0;
+  const finalPrice = hasDiscount && product 
+      ? Math.round(product.price - (product.price * (product.discount_percentage / 100))) 
+      : product?.price || 0;
+
   const handleBuyNow = () => {
     if (product?.is_sold_out) return; // Safety check
     if (!user) return alert("Please log in to purchase.")
     setBuying(true)
-    const amount = product.price * 100 
+
+    // 🌟 FAST-TRACK DISCOUNT FIX FOR RAZORPAY 🌟
+    const amount = finalPrice * 100 
+    
     const options = {
         key: RAZORPAY_KEY_ID,
         amount: amount,
@@ -353,7 +379,9 @@ export default function ProductPage() {
         image: "https://fwyliqsazdyprlkemavu.supabase.co/storage/v1/object/public/jewelry-images/banner.jpg",
         handler: async function (response: any) { 
             const orderId = `ORD-${Date.now()}`
-            const { error } = await supabase.from('orders').insert({ id: orderId, user_id: user.id, items: [product], total: product.price, status: 'Processing' })
+            // Pass the discounted price into the order history!
+            const payloadToSave = { ...product, original_price: product.price, price: finalPrice }
+            const { error } = await supabase.from('orders').insert({ id: orderId, user_id: user.id, items: [payloadToSave], total: finalPrice, status: 'Processing' })
             if (error) { console.error(error); alert("Order error.") } else { alert("Success!"); router.push('/account') }
             setBuying(false); 
         },
@@ -368,13 +396,37 @@ export default function ProductPage() {
     rzp1.open();
   }
 
+  // 🌟 BULLETPROOF CART DATA INJECTION 🌟
   const handleAddToCart = (itemToAdd = product) => {
-    if (itemToAdd.is_sold_out) return; // Safety check
-    const existing = JSON.parse(localStorage.getItem('cart') || '[]'); const existingIndex = existing.findIndex((i: any) => i.id === itemToAdd.id)
-    let newCart; if (existingIndex > -1) { newCart = [...existing]; newCart[existingIndex].quantity = (newCart[existingIndex].quantity || 1) + 1 } else { newCart = [...existing, { ...itemToAdd, quantity: 1 }] }
-    localStorage.setItem('cart', JSON.stringify(newCart)); if (itemToAdd.id === product.id) { setAddedToCart(true); setTimeout(() => setAddedToCart(false), 2000) }
+    if (itemToAdd.is_sold_out) return; 
+
+    // Compute exact cart-ready payload
+    const itemHasDiscount = itemToAdd.discount_percentage && itemToAdd.discount_percentage > 0;
+    const itemFinalPrice = itemHasDiscount 
+        ? Math.round(itemToAdd.price - (itemToAdd.price * (itemToAdd.discount_percentage / 100))) 
+        : itemToAdd.price;
+
+    const payloadToSave = {
+        ...itemToAdd,
+        original_price: itemToAdd.price,
+        price: itemFinalPrice // CART ALWAYS USES .price FOR TOTALS!
+    };
+
+    const existing = JSON.parse(localStorage.getItem('cart') || '[]'); 
+    const existingIndex = existing.findIndex((i: any) => i.id === itemToAdd.id)
     
-    // Dispatch custom event to trigger cart notification in layout
+    let newCart; 
+    if (existingIndex > -1) { 
+        newCart = [...existing]; 
+        newCart[existingIndex].quantity = (newCart[existingIndex].quantity || 1) + 1;
+        newCart[existingIndex].price = itemFinalPrice; // Force update to latest price
+    } else { 
+        newCart = [...existing, { ...payloadToSave, quantity: 1 }] 
+    }
+    
+    localStorage.setItem('cart', JSON.stringify(newCart)); 
+    if (itemToAdd.id === product.id) { setAddedToCart(true); setTimeout(() => setAddedToCart(false), 2000) }
+    
     window.dispatchEvent(new Event("storage"));
     
     if (itemToAdd.id === product.id) {
@@ -386,7 +438,7 @@ export default function ProductPage() {
     }
   }
 
-  // 🌟 NEW: DYNAMIC BUNDLE ADD TO CART LOGIC 🌟
+  // 🌟 DYNAMIC BUNDLE ADD TO CART LOGIC (WITH DISCOUNTS) 🌟
   const handleAddBundleToCart = () => {
       const itemsToAdd = [];
       if (bundleSelection.main && product && !product.is_sold_out) itemsToAdd.push(product);
@@ -397,12 +449,18 @@ export default function ProductPage() {
       const existing = JSON.parse(localStorage.getItem('cart') || '[]');
       let newCart = [...existing];
 
-      itemsToAdd.forEach(item => {
-          const existingIndex = newCart.findIndex((i: any) => i.id === item.id);
+      itemsToAdd.forEach(rawItem => {
+          // Mathematically calculate the correct price before injection
+          const dPct = rawItem.discount_percentage || 0;
+          const safePrice = dPct > 0 ? Math.round(rawItem.price - (rawItem.price * (dPct / 100))) : rawItem.price;
+          const cleanItem = { ...rawItem, original_price: rawItem.price, price: safePrice };
+
+          const existingIndex = newCart.findIndex((i: any) => i.id === cleanItem.id);
           if (existingIndex > -1) {
               newCart[existingIndex].quantity = (newCart[existingIndex].quantity || 1) + 1;
+              newCart[existingIndex].price = safePrice;
           } else {
-              newCart.push({ ...item, quantity: 1 });
+              newCart.push({ ...cleanItem, quantity: 1 });
           }
           
           let sessionId = localStorage.getItem("lotus_session_id") || "unknown";
@@ -410,7 +468,7 @@ export default function ProductPage() {
               method: "POST", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ 
                   user_id: sessionId, 
-                  product_id: item.id, 
+                  product_id: cleanItem.id, 
                   event_type: 'add_to_cart', 
                   recommendation_model: 'fbt_apriori' 
               })
@@ -418,10 +476,17 @@ export default function ProductPage() {
       });
 
       localStorage.setItem('cart', JSON.stringify(newCart));
-      setAddedBothToCart(true); // Reusing this state for the button confirmation
+      setAddedBothToCart(true); 
       setTimeout(() => setAddedBothToCart(false), 2000);
       window.dispatchEvent(new Event("storage"));
   }
+
+  // Helper for FBT Bundle display price
+  const getSafePrice = (prod: any) => {
+      if (!prod) return 0;
+      const d = prod.discount_percentage || 0;
+      return d > 0 ? Math.round(prod.price - (prod.price * (d / 100))) : prod.price;
+  };
 
   const toggleWishlist = () => { 
       const existing = JSON.parse(localStorage.getItem('wishlist') || '[]'); let updated; if (isWishlisted) { updated = existing.filter((p: any) => p.id !== product.id); setIsWishlisted(false) } else { updated = [...existing, product]; setIsWishlisted(true) } setWishlist(updated); localStorage.setItem('wishlist', JSON.stringify(updated)) 
@@ -477,6 +542,15 @@ export default function ProductPage() {
                         /> 
                     : <span className="text-[#e5d5a3]/30 tracking-widest">IMAGE</span>}
                     
+                    {/* 🌟 PRODUCT PAGE DISCOUNT BADGE 🌟 */}
+                    {hasDiscount && !product.is_sold_out && (
+                        <div className="absolute top-4 left-4 z-20 pointer-events-none">
+                            <span className="bg-red-600/95 backdrop-blur-md border border-red-500/50 px-3 py-1.5 font-sans text-[10px] md:text-xs font-bold uppercase text-white rounded shadow-[0_0_20px_rgba(220,38,38,0.6)] tracking-widest">
+                                {product.discount_percentage}% OFF
+                            </span>
+                        </div>
+                    )}
+
                     {/* 🌟 ELITE SOLD OUT OVERLAY (MAIN IMAGE) 🌟 */}
                     {product.is_sold_out && (
                         <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
@@ -509,7 +583,15 @@ export default function ProductPage() {
             <h1 className="text-3xl md:text-5xl font-serif text-[#f4e4bc] mb-2 leading-tight">{product.name}</h1>
             <div className="flex items-center gap-2 mb-6 text-sm"><StarRatingDisplay rating={avgRating} /><span className="text-[#e5d5a3]/50 hover:text-[#e5d5a3] cursor-pointer border-b border-[#e5d5a3]/30">{reviews.length} ratings</span></div>
             <div className="h-px w-full bg-[#e5d5a3]/10 mb-6"></div>
-            <p className={`text-4xl text-[#c5a059] mb-2 font-serif ${product.is_sold_out ? 'opacity-50' : ''}`}>₹{product.price.toLocaleString("en-IN")}</p>
+            
+            {/* 🌟 DISCOUNT PRICING UI 🌟 */}
+            <div className="flex items-baseline gap-4 mb-2">
+                <p className={`text-4xl text-[#c5a059] font-serif ${product.is_sold_out ? 'opacity-50' : ''}`}>₹{finalPrice.toLocaleString("en-IN")}</p>
+                {hasDiscount && (
+                    <p className="text-xl text-[#e5d5a3]/40 font-serif line-through decoration-[#c5a059]/50">₹{product.price.toLocaleString("en-IN")}</p>
+                )}
+            </div>
+
             <p className="text-[#e5d5a3]/50 text-xs uppercase tracking-wider mb-8">Inclusive of all taxes</p>
             
             <div className="space-y-3 mb-8">
@@ -540,7 +622,7 @@ export default function ProductPage() {
         </div>
       </div>
 
-      {/* 🌟 NEW ELITE FREQUENTLY BOUGHT TOGETHER SECTION 🌟 */}
+      {/* 🌟 NEW ELITE FREQUENTLY BOUGHT TOGETHER SECTION (DISCOUNT AWARE) 🌟 */}
       {fbtLoading && (
           <div className="w-full py-12 border-t border-[#e5d5a3]/10 bg-[#1a0505]/50 flex items-center justify-center">
               <span className="text-[#c5a059] text-xs uppercase tracking-widest animate-pulse">Analyzing Market Baskets...</span>
@@ -563,8 +645,11 @@ export default function ProductPage() {
                           <div className={`relative shrink-0 transition-all duration-500 ${!bundleSelection.main || product.is_sold_out ? 'opacity-40 grayscale scale-95' : 'scale-100 shadow-[0_0_20px_rgba(197,160,89,0.15)]'}`}>
                               <div className="block h-32 w-32 md:h-48 md:w-48 bg-[#2a0808] rounded border border-[#c5a059]/30 overflow-hidden relative">
                                   <img src={product.image_url} className={`h-full w-full object-cover ${product.is_sold_out ? 'grayscale opacity-70' : ''}`} />
+                                  {hasDiscount && (
+                                      <span className="absolute top-0 left-0 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-br z-10">{product.discount_percentage}% OFF</span>
+                                  )}
                                   {product.is_sold_out && (
-                                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
                                           <div className="w-full bg-[#1a0505]/80 py-2 flex justify-center">
                                               <span className="text-[#c5a059] text-[8px] md:text-[10px] font-bold uppercase tracking-[0.3em] ml-[0.3em]">Sold Out</span>
                                           </div>
@@ -579,8 +664,11 @@ export default function ProductPage() {
                           <div className={`relative shrink-0 transition-all duration-500 ${!bundleSelection.fbt || fbtProduct.is_sold_out ? 'opacity-40 grayscale scale-95' : 'scale-100 shadow-[0_0_20px_rgba(197,160,89,0.15)]'}`}>
                               <Link href={`/product/${fbtProduct.id}?ref=fbt_apriori`} className="block h-32 w-32 md:h-48 md:w-48 bg-[#2a0808] rounded border border-[#c5a059]/30 overflow-hidden group relative">
                                   <img src={fbtProduct.image_url} className={`h-full w-full object-cover ${fbtProduct.is_sold_out ? 'grayscale opacity-70' : 'group-hover:scale-110 transition-transform duration-700'}`} />
+                                  {fbtProduct.discount_percentage > 0 && (
+                                      <span className="absolute top-0 left-0 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-br z-10">{fbtProduct.discount_percentage}% OFF</span>
+                                  )}
                                   {fbtProduct.is_sold_out && (
-                                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
                                           <div className="w-full bg-[#1a0505]/80 py-2 flex justify-center">
                                               <span className="text-[#c5a059] text-[8px] md:text-[10px] font-bold uppercase tracking-[0.3em] ml-[0.3em]">Sold Out</span>
                                           </div>
@@ -594,7 +682,7 @@ export default function ProductPage() {
                       <div className="flex-1 w-full bg-[#1a0505]/80 backdrop-blur border border-[#e5d5a3]/10 p-6 md:p-8 rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-8 shadow-2xl">
                           <div className="space-y-5 w-full md:w-auto">
                               
-                              {/* Custom Luxury Checkbox 1 */}
+                              {/* Custom Luxury Checkbox 1 (Discount Aware) */}
                               <label className={`flex items-start gap-4 group ${product.is_sold_out ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                   <div className="relative flex items-center justify-center mt-1">
                                       <input type="checkbox" disabled={product.is_sold_out} checked={bundleSelection.main && !product.is_sold_out} onChange={() => setBundleSelection(p => ({...p, main: !p.main}))} className="peer sr-only" />
@@ -607,11 +695,16 @@ export default function ProductPage() {
                                           <span className="text-[#e5d5a3]/60 font-normal mr-2">This item:</span> 
                                           {product.name}
                                       </span>
-                                      <span className={`font-serif text-lg ${(bundleSelection.main && !product.is_sold_out) ? 'text-[#c5a059]' : 'text-[#c5a059]/50'}`}>₹{product.price.toLocaleString("en-IN")}</span>
+                                      <div className="flex items-center gap-2">
+                                          <span className={`font-serif text-lg ${(bundleSelection.main && !product.is_sold_out) ? 'text-[#c5a059]' : 'text-[#c5a059]/50'}`}>₹{finalPrice.toLocaleString("en-IN")}</span>
+                                          {hasDiscount && (
+                                              <span className={`text-[10px] line-through ${(bundleSelection.main && !product.is_sold_out) ? 'text-[#e5d5a3]/40' : 'text-[#e5d5a3]/20'}`}>₹{product.price.toLocaleString("en-IN")}</span>
+                                          )}
+                                      </div>
                                   </div>
                               </label>
                               
-                              {/* Custom Luxury Checkbox 2 */}
+                              {/* Custom Luxury Checkbox 2 (Discount Aware) */}
                               <label className={`flex items-start gap-4 group ${fbtProduct.is_sold_out ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                   <div className="relative flex items-center justify-center mt-1">
                                       <input type="checkbox" disabled={fbtProduct.is_sold_out} checked={bundleSelection.fbt && !fbtProduct.is_sold_out} onChange={() => setBundleSelection(p => ({...p, fbt: !p.fbt}))} className="peer sr-only" />
@@ -623,7 +716,12 @@ export default function ProductPage() {
                                       <Link href={`/product/${fbtProduct.id}?ref=fbt_apriori`} className={`text-sm md:text-base font-bold transition-colors ${(bundleSelection.fbt && !fbtProduct.is_sold_out) ? 'text-[#e5d5a3] hover:text-[#c5a059]' : 'text-[#e5d5a3]/50 line-through'}`}>
                                           {fbtProduct.name}
                                       </Link>
-                                      <span className={`font-serif text-lg ${(bundleSelection.fbt && !fbtProduct.is_sold_out) ? 'text-[#c5a059]' : 'text-[#c5a059]/50'}`}>₹{fbtProduct.price.toLocaleString("en-IN")}</span>
+                                      <div className="flex items-center gap-2">
+                                          <span className={`font-serif text-lg ${(bundleSelection.fbt && !fbtProduct.is_sold_out) ? 'text-[#c5a059]' : 'text-[#c5a059]/50'}`}>₹{getSafePrice(fbtProduct).toLocaleString("en-IN")}</span>
+                                          {fbtProduct.discount_percentage > 0 && (
+                                              <span className={`text-[10px] line-through ${(bundleSelection.fbt && !fbtProduct.is_sold_out) ? 'text-[#e5d5a3]/40' : 'text-[#e5d5a3]/20'}`}>₹{fbtProduct.price.toLocaleString("en-IN")}</span>
+                                          )}
+                                      </div>
                                   </div>
                               </label>
                           </div>
@@ -632,7 +730,7 @@ export default function ProductPage() {
                               <div className="text-left md:text-right">
                                   <p className="text-[10px] uppercase tracking-widest text-[#e5d5a3]/50 mb-1">Total Bundle Price</p>
                                   <p className="text-4xl font-serif text-[#c5a059]">
-                                      ₹{(((bundleSelection.main && !product.is_sold_out) ? product.price : 0) + ((bundleSelection.fbt && !fbtProduct.is_sold_out) ? fbtProduct.price : 0)).toLocaleString("en-IN")}
+                                      ₹{(((bundleSelection.main && !product.is_sold_out) ? finalPrice : 0) + ((bundleSelection.fbt && !fbtProduct.is_sold_out) ? getSafePrice(fbtProduct) : 0)).toLocaleString("en-IN")}
                                   </p>
                               </div>
                               <button 

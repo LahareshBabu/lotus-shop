@@ -9,19 +9,16 @@ import { useRouter } from 'next/navigation'
 // 1. CONFIGURATION
 import { supabase } from '@/app/supabase'
 
-// 🌟 HERO BANNER DATA (JIOHOTSTAR STYLE) 🌟
-// Currently set to 1 banner as requested. Add more here later to activate the switcher!
-const HERO_BANNERS = [
-    {
-        tag: "Imitation Fine Jewelry",
-        titlePrefix: "Heritage Craftsmanship. ",
-        titleHighlight: "Uncompromising",
-        titleSuffix: " Elegance.",
-        desc: "Discover our exclusive collection of royal Indian designs, meticulously crafted to mirror the exact grandeur of solid gold.",
-        btn: "Shop Collection",
-        img: "https://fwyliqsazdyprlkemavu.supabase.co/storage/v1/object/public/jewelry-images/banner.jpg"
-    }
-]
+// 🌟 HERO BANNER DEFAULT (Safety Net) 🌟
+const DEFAULT_HERO = {
+    tag: "Imitation Fine Jewelry",
+    title_prefix: "Heritage Craftsmanship. ",
+    title_highlight: "Uncompromising",
+    title_suffix: " Elegance.",
+    desc_text: "Discover our exclusive collection of royal Indian designs, meticulously crafted to mirror the exact grandeur of solid gold.",
+    btn_text: "Shop Collection",
+    image_url: "https://fwyliqsazdyprlkemavu.supabase.co/storage/v1/object/public/jewelry-images/banner.jpg"
+}
 
 // 🌟 MEGA MENU DATA STRUCTURE
 const MEGA_MENU = [
@@ -100,6 +97,12 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
   const [imgLoaded, setImgLoaded] = useState(false)
   const [isGlittering, setIsGlittering] = useState(false)
 
+  // 🌟 NEW: Calculate Discounted Price 🌟
+  const hasDiscount = product.discount_percentage && product.discount_percentage > 0;
+  const finalPrice = hasDiscount 
+      ? Math.round(product.price - (product.price * (product.discount_percentage / 100))) 
+      : product.price;
+
   const trackInteraction = (eventType: string) => {
       let sessionId = "unknown";
       if (typeof window !== "undefined") {
@@ -159,7 +162,12 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
             )}
         </Link>
 
-        {product.id === 1 && !product.is_sold_out && <span className="absolute left-3 top-3 bg-[#e5d5a3] px-3 py-1 font-sans text-[10px] font-bold uppercase text-[#1a0505] rounded-sm z-10 shadow-lg">BESTSELLER</span>}
+        {/* 🌟 NEW: DISCOUNT BADGE 🌟 */}
+        {hasDiscount && !product.is_sold_out && (
+            <span className="absolute left-3 top-3 bg-red-600/90 backdrop-blur-sm border border-red-500/50 px-2.5 py-1 font-sans text-[10px] font-bold uppercase text-white rounded-sm z-10 shadow-[0_0_15px_rgba(220,38,38,0.5)] tracking-wider">
+                {product.discount_percentage}% OFF
+            </span>
+        )}
         
         <button onClick={handleWishlistClick} className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-[#1a0505]/60 backdrop-blur-md hover:bg-[#e5d5a3] hover:text-[#1a0505] text-[#e5d5a3] border border-[#e5d5a3]/30 z-20 transition-colors duration-300">
             {isGlittering && (
@@ -202,7 +210,13 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
         <Link href={`/product/${product.id}`} className="hover:text-[#c5a059] transition-colors duration-300" onClick={() => trackInteraction('view')}>
             <h3 className="font-serif text-lg font-medium tracking-wide text-[#e5d5a3] line-clamp-1">{product.name}</h3>
         </Link>
-        <p className="font-sans text-base font-bold text-[#f4e4bc]">₹{product.price.toLocaleString("en-IN")}</p>
+        <div className="flex items-center gap-2">
+            {/* 🌟 NEW: DISCOUNT PRICING DISPLAY 🌟 */}
+            <p className="font-sans text-base font-bold text-[#f4e4bc]">₹{finalPrice.toLocaleString("en-IN")}</p>
+            {hasDiscount && (
+                <p className="font-sans text-xs text-[#e5d5a3]/40 line-through">₹{product.price.toLocaleString("en-IN")}</p>
+            )}
+        </div>
       </div>
     </article>
   )
@@ -231,16 +245,29 @@ export default function Page() {
 
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null)
 
-  // 🌟 HOTSTAR BANNER LOGIC 🌟
+  // 🌟 NEW: LIVE BANNERS STATE 🌟
+  const [heroBanners, setHeroBanners] = useState<any[]>([DEFAULT_HERO])
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0)
+
+  // 🌟 NEW: Fetch Banners from Supabase 🌟
+  useEffect(() => {
+      async function fetchBanners() {
+          const { data } = await supabase.from('hero_banners').select('*').order('created_at', { ascending: true });
+          if (data && data.length > 0) {
+              setHeroBanners(data);
+          }
+      }
+      fetchBanners();
+  }, []);
 
   // Auto-scroll the hero banner every 5 seconds
   useEffect(() => {
+      if (heroBanners.length <= 1) return; // Don't scroll if there's only 1 banner
       const timer = setInterval(() => {
-          setCurrentBannerIndex((prev) => (prev + 1) % HERO_BANNERS.length);
+          setCurrentBannerIndex((prev) => (prev + 1) % heroBanners.length);
       }, 5000);
       return () => clearInterval(timer);
-  }, []);
+  }, [heroBanners]);
 
   // 🌟 FEATURED TREASURES FILTER STATE 🌟
   const [activeFilter, setActiveFilter] = useState('Featured Items')
@@ -301,7 +328,7 @@ export default function Page() {
       document.addEventListener("mousedown", handleClickOutside); return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // 🌟 FORTRESS DATA SYNCHRONIZER: Ensures Homepage, Cart, and Wishlist ALWAYS match Supabase DB 🌟
+  // 🌟 FORTRESS DATA SYNCHRONIZER 🌟
   useEffect(() => {
     async function init() {
         try {
@@ -350,15 +377,29 @@ export default function Page() {
 
   const handleLogin = async (e: React.FormEvent) => { e.preventDefault(); setLoadingLogin(true); const { error } = await supabase.auth.signInWithOtp({ email }); if (error) { setLoginMessage("Error: " + error.message) } else { setLoginMessage("Magic Link sent! Check your email.") } setLoadingLogin(false) }
   
+  // 🌟 CLAUDE'S BULLETPROOF CART LOGIC 🌟
   const addToCart = (product: any) => { 
       if (product.is_sold_out) return; // Safety lock
+
+      const hasDiscount = product.discount_percentage && product.discount_percentage > 0;
+      const finalPrice = hasDiscount 
+          ? Math.round(product.price - (product.price * (product.discount_percentage / 100))) 
+          : product.price;
+
+      const payloadToSave = {
+          ...product,
+          original_price: product.price,
+          price: finalPrice // Cart relies on .price for totals
+      };
+
       const existingItemIndex = cart.findIndex(item => item.id === product.id)
       let newCart;
       if (existingItemIndex > -1) {
           newCart = [...cart]
           newCart[existingItemIndex].quantity = (newCart[existingItemIndex].quantity || 1) + 1
+          newCart[existingItemIndex].price = finalPrice // Ensure latest price is set
       } else {
-          newCart = [...cart, { ...product, quantity: 1 }]
+          newCart = [...cart, { ...payloadToSave, quantity: 1 }]
       }
       setCart(newCart); 
       localStorage.setItem('cart', JSON.stringify(newCart)) 
@@ -509,7 +550,13 @@ export default function Page() {
               {wishlist.length === 0 ? <p className="text-center text-[#e5d5a3]/40 italic mt-10">No favorites yet.</p> : [...wishlist].reverse().map((item) => ( 
                   <div key={item.id} className="flex gap-4 p-2 border-b border-[#e5d5a3]/10 items-center">
                       <div className="h-14 w-14 bg-[#2a0808] rounded overflow-hidden"><img src={item.image_url} className="h-full w-full object-cover" /></div>
-                      <div className="flex-1"><p className="text-sm text-[#e5d5a3] font-serif">{item.name}</p><p className="text-xs text-[#e5d5a3]/60">₹{item.price.toLocaleString("en-IN")}</p></div>
+                      <div className="flex-1">
+                          <p className="text-sm text-[#e5d5a3] font-serif">{item.name}</p>
+                          <p className="text-xs text-[#e5d5a3]/60">
+                              {/* Show final discounted price in Wishlist too */}
+                              ₹{Math.round(item.price - (item.price * ((item.discount_percentage || 0) / 100))).toLocaleString("en-IN")}
+                          </p>
+                      </div>
                       <div className="flex gap-2 items-center">
                           {item.is_sold_out ? (
                               <span className="text-[10px] text-[#e5d5a3]/40 uppercase tracking-widest font-bold px-2 py-1 border border-[#e5d5a3]/10 rounded cursor-not-allowed">
@@ -536,8 +583,10 @@ export default function Page() {
           <div className="flex-1 overflow-y-auto space-y-4 p-6 [&::-webkit-scrollbar]:w-3.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-[#c5a059] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border-[3px] [&::-webkit-scrollbar-thumb]:border-solid [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:[background-clip:padding-box] hover:[&::-webkit-scrollbar-thumb]:bg-[#e5d5a3]">
               {cart.length === 0 ? <div className="text-center py-10 text-[#e5d5a3]/40 font-sans italic">Your royal bag is empty.</div> : cart.map((item, idx) => (
                   <div key={idx} className="flex gap-4 bg-[#1a0505]/50 p-3 rounded border border-[#e5d5a3]/10">
-                      <div className="h-16 w-16 bg-[#1a0505] flex-shrink-0 overflow-hidden rounded-sm border border-[#e5d5a3]/10">
+                      <div className="h-16 w-16 bg-[#1a0505] flex-shrink-0 overflow-hidden rounded-sm border border-[#e5d5a3]/10 relative">
                           {item.image_url && <img src={item.image_url} className="h-full w-full object-cover" />}
+                          {/* Mini Cart Badge */}
+                          {item.discount_percentage > 0 && <span className="absolute top-0 left-0 bg-red-600 text-white text-[8px] font-bold px-1 py-0.5 rounded-br-sm">{item.discount_percentage}% OFF</span>}
                       </div>
                       <div className="flex-1 flex flex-col justify-between">
                           <div>
@@ -566,70 +615,83 @@ export default function Page() {
           </div>
       </div>
 
-      {/* 🌟 JIOHOTSTAR STYLE HERO CAROUSEL 🌟 */}
+      {/* 🌟 JIOHOTSTAR STYLE HERO CAROUSEL w/ Fallback Logic 🌟 */}
       <section id="hero" className="relative overflow-hidden bg-[#1a0505] min-h-[600px] lg:min-h-[800px] border-b border-[#e5d5a3]/10 flex items-center justify-center">
         
-        {/* Render all banners, fade between them based on currentBannerIndex */}
-        {HERO_BANNERS.map((banner, idx) => (
-            <div 
-                key={idx} 
-                className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${currentBannerIndex === idx ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
-            >
-                <div className="absolute inset-0 z-0">
-                    <img src={banner.img} alt="Royal Jewelry Background" className="h-full w-full object-cover opacity-40" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#1a0505] via-[#2a0808]/60 to-[#1a0505]/30" />
-                </div>
-                
-                <div className="relative mx-auto flex max-w-7xl flex-col items-center text-center px-6 lg:px-8 z-10 h-full justify-center pt-32 lg:pt-40">
-                    <span className={`mb-6 inline-block border border-[#c5a059]/60 px-6 py-2 font-sans text-xs font-bold uppercase tracking-[0.3em] text-[#c5a059] drop-shadow-md rounded ${currentBannerIndex === idx ? 'animate-hero-1' : ''}`}>
-                        {banner.tag}
-                    </span>
-                    <h1 className={`max-w-6xl font-serif text-5xl font-medium leading-tight tracking-wide text-[#f4e4bc] md:text-6xl lg:text-7xl drop-shadow-lg ${currentBannerIndex === idx ? 'animate-hero-2' : ''}`}>
-                        {banner.titlePrefix} <span className="text-[#c5a059] italic">{banner.titleHighlight}</span> {banner.titleSuffix}
-                    </h1>
-                    <p className={`mt-8 max-w-xl font-sans text-sm leading-relaxed text-[#e5d5a3]/90 md:text-base drop-shadow-md ${currentBannerIndex === idx ? 'animate-hero-3' : ''}`}>
-                        {banner.desc}
-                    </p>
-                    <div className={`mt-12 flex flex-col sm:flex-row gap-4 ${currentBannerIndex === idx ? 'animate-hero-btn' : ''}`}>
-                        {/* 🌟 FIX: Preserved original scrollTo('featured') action per instructions 🌟 */}
-                        <button onClick={() => scrollTo('featured')} className="inline-flex items-center justify-center gap-2 bg-transparent border border-[#c5a059] px-10 py-4 font-sans text-xs font-bold uppercase tracking-[0.2em] text-[#c5a059] transition-all hover:bg-[#c5a059] hover:text-[#1a0505] hover:shadow-[0_0_20px_rgba(197,160,89,0.3)] cursor-pointer rounded">
-                            {banner.btn}
-                        </button>
+        {heroBanners.map((banner, idx) => {
+            // 🌟 SMART FALLBACK LOGIC: If custom text is empty, inherit from Primary Banner (Index 0) or DEFAULT_HERO
+            const isTextEmpty = !banner.title_prefix && !banner.title_highlight && !banner.title_suffix;
+            const sourceBanner = isTextEmpty && heroBanners[0] ? heroBanners[0] : banner;
+
+            const finalTag = banner.tag || sourceBanner.tag || DEFAULT_HERO.tag;
+            const finalPrefix = isTextEmpty ? (sourceBanner.title_prefix || DEFAULT_HERO.title_prefix) : banner.title_prefix;
+            const finalHighlight = isTextEmpty ? (sourceBanner.title_highlight || DEFAULT_HERO.title_highlight) : banner.title_highlight;
+            const finalSuffix = isTextEmpty ? (sourceBanner.title_suffix || DEFAULT_HERO.title_suffix) : banner.title_suffix;
+            const finalDesc = banner.desc_text || sourceBanner.desc_text || DEFAULT_HERO.desc_text;
+            const finalBtn = banner.btn_text || sourceBanner.btn_text || DEFAULT_HERO.btn_text;
+
+            return (
+                <div 
+                    key={idx} 
+                    className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${currentBannerIndex === idx ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
+                >
+                    <div className="absolute inset-0 z-0">
+                        <img src={banner.image_url} alt="Royal Jewelry Background" className="h-full w-full object-cover opacity-40" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#1a0505] via-[#2a0808]/60 to-[#1a0505]/30" />
+                    </div>
+                    
+                    <div className="relative mx-auto flex max-w-7xl flex-col items-center text-center px-6 lg:px-8 z-10 h-full justify-center pt-32 lg:pt-40">
+                        {finalTag && (
+                            <span className={`mb-6 inline-block border border-[#c5a059]/60 px-6 py-2 font-sans text-xs font-bold uppercase tracking-[0.3em] text-[#c5a059] drop-shadow-md rounded ${currentBannerIndex === idx ? 'animate-hero-1' : ''}`}>
+                                {finalTag}
+                            </span>
+                        )}
+                        <h1 className={`max-w-6xl font-serif text-5xl font-medium leading-tight tracking-wide text-[#f4e4bc] md:text-6xl lg:text-7xl drop-shadow-lg ${currentBannerIndex === idx ? 'animate-hero-2' : ''}`}>
+                            {finalPrefix} <span className="text-[#c5a059] italic">{finalHighlight}</span> {finalSuffix}
+                        </h1>
+                        <p className={`mt-8 max-w-xl font-sans text-sm leading-relaxed text-[#e5d5a3]/90 md:text-base drop-shadow-md ${currentBannerIndex === idx ? 'animate-hero-3' : ''}`}>
+                            {finalDesc}
+                        </p>
+                        <div className={`mt-12 flex flex-col sm:flex-row gap-4 ${currentBannerIndex === idx ? 'animate-hero-btn' : ''}`}>
+                            <button onClick={() => scrollTo('featured')} className="inline-flex items-center justify-center gap-2 bg-transparent border border-[#c5a059] px-10 py-4 font-sans text-xs font-bold uppercase tracking-[0.2em] text-[#c5a059] transition-all hover:bg-[#c5a059] hover:text-[#1a0505] hover:shadow-[0_0_20px_rgba(197,160,89,0.3)] cursor-pointer rounded">
+                                {finalBtn}
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        ))}
+            )
+        })}
 
-        {/* 🌟 JIOHOTSTAR BOTTOM-RIGHT THUMBNAIL CONTROLS (Will only show 1 for now) 🌟 */}
-        <div className="absolute bottom-6 right-6 lg:bottom-12 lg:right-12 z-30 flex items-center gap-2 bg-[#1a0505]/80 backdrop-blur-md p-2 rounded border border-[#e5d5a3]/10 shadow-2xl">
-            {HERO_BANNERS.map((banner, idx) => (
-                <button
-                    key={idx}
-                    onClick={() => setCurrentBannerIndex(idx)}
-                    className={`relative h-12 w-20 lg:h-16 lg:w-28 overflow-hidden rounded border transition-all duration-300 ${
-                        currentBannerIndex === idx 
-                        ? 'border-[#c5a059] opacity-100 shadow-[0_0_15px_rgba(197,160,89,0.5)]' 
-                        : 'border-transparent opacity-40 hover:opacity-100'
-                    }`}
-                >
-                    <img src={banner.img} className="absolute inset-0 w-full h-full object-cover" />
-                    
-                    {/* Animated Progress Bar on Active Thumbnail */}
-                    {currentBannerIndex === idx && (
-                        <div className="absolute bottom-0 left-0 h-1 bg-[#c5a059] animate-[loadingBar_5s_linear_infinite]"></div>
-                    )}
-                </button>
-            ))}
-        </div>
+        {/* 🌟 JIOHOTSTAR BOTTOM-RIGHT THUMBNAIL CONTROLS 🌟 */}
+        {heroBanners.length > 1 && (
+            <div className="absolute bottom-6 right-6 lg:bottom-12 lg:right-12 z-30 flex items-center gap-2 bg-[#1a0505]/80 backdrop-blur-md p-2 rounded border border-[#e5d5a3]/10 shadow-2xl">
+                {heroBanners.map((banner, idx) => (
+                    <button
+                        key={idx}
+                        onClick={() => setCurrentBannerIndex(idx)}
+                        className={`relative h-12 w-20 lg:h-16 lg:w-28 overflow-hidden rounded border transition-all duration-300 ${
+                            currentBannerIndex === idx 
+                            ? 'border-[#c5a059] opacity-100 shadow-[0_0_15px_rgba(197,160,89,0.5)]' 
+                            : 'border-transparent opacity-40 hover:opacity-100'
+                        }`}
+                    >
+                        <img src={banner.image_url} className="absolute inset-0 w-full h-full object-cover" />
+                        
+                        {/* Animated Progress Bar on Active Thumbnail */}
+                        {currentBannerIndex === idx && (
+                            <div className="absolute bottom-0 left-0 h-1 bg-[#c5a059] animate-[loadingBar_5s_linear_infinite]"></div>
+                        )}
+                    </button>
+                ))}
+            </div>
+        )}
       </section>
 
-      {/* 🌟 FIX: RESTORED ORIGINAL GRID LAYOUT WITH NEW FILTER PILLS 🌟 */}
       <section id="featured" className="py-24 px-4 max-w-7xl mx-auto reveal-on-scroll">
         <div className="mb-16 text-center">
             <span className="mb-3 inline-block font-sans text-xs font-bold uppercase tracking-[0.3em] text-[#e5d5a3]/40">Curated for You</span>
             <h2 className="font-serif text-4xl font-medium tracking-wide text-[#f4e4bc] mb-8">Featured Treasures</h2>
             
-            {/* 🌟 NEW: FILTER PILLS ABOVE THE GRID 🌟 */}
             <div className="flex flex-wrap justify-center gap-3">
                 {['Featured Items', 'Newest Arrivals', 'Hottest selling', 'Highest Rated'].map(filter => (
                     <button 

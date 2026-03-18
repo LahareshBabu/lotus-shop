@@ -26,6 +26,7 @@ function UploadContent() {
   // Form State
   const [name, setName] = useState("")
   const [price, setPrice] = useState("")
+  const [discount, setDiscount] = useState("0") // 🌟 NEW: Discount State
   const [category, setCategory] = useState("Necklaces")
   const [description, setDescription] = useState("")
   
@@ -64,6 +65,7 @@ function UploadContent() {
             if (data) {
                 setName(data.name)
                 setPrice(data.price.toString())
+                setDiscount((data.discount_percentage || 0).toString()) // 🌟 NEW: Hydrate Discount
                 setCategory(data.category)
                 setDescription(data.description || '')
                 
@@ -107,6 +109,7 @@ function UploadContent() {
   const resetForm = () => {
       setName("")
       setPrice("")
+      setDiscount("0")
       setDescription("")
       setImageFiles([])
       setPreviewUrls([])
@@ -141,6 +144,7 @@ function UploadContent() {
           const payload = {
               name,
               price: parseFloat(price),
+              discount_percentage: parseInt(discount) || 0, // 🌟 NEW: Add discount to payload
               category,
               description,
               image_url: finalImageUrls[0],
@@ -189,7 +193,7 @@ function UploadContent() {
                   <div className="flex flex-col gap-3">
                       {!editId && (
                           <button onClick={resetForm} className="w-full bg-[#c5a059] text-[#1a0505] py-4 rounded text-xs font-bold uppercase tracking-widest hover:bg-white transition-all flex items-center justify-center gap-2 shadow-lg">
-                              <PlusIcon /> Add Another Treasure
+                              <PlusIcon className="h-5 w-5" /> Add Another Treasure
                           </button>
                       )}
                       <button onClick={() => router.push('/admin/products')} className={`w-full ${editId ? 'bg-[#c5a059] text-[#1a0505] hover:bg-white shadow-lg' : 'border border-[#e5d5a3]/20 text-[#e5d5a3] hover:bg-[#e5d5a3] hover:text-[#1a0505]'} py-4 rounded text-xs font-bold uppercase tracking-widest transition-all`}>
@@ -204,7 +208,7 @@ function UploadContent() {
   return (
     <div className="min-h-screen bg-[#1a0505] text-[#e5d5a3] font-sans p-8">
       <div className="max-w-4xl mx-auto flex items-center gap-4 mb-10">
-          <Link href="/admin/products" className="text-[#e5d5a3]/50 hover:text-white transition-colors"><ArrowLeft /></Link>
+          <Link href="/admin/products" className="text-[#e5d5a3]/50 hover:text-white transition-colors"><ArrowLeft className="h-6 w-6" /></Link>
           <h1 className="font-serif text-2xl text-[#f4e4bc]">{editId ? 'Edit Treasure Details' : 'Add New Treasure'}</h1>
       </div>
 
@@ -216,7 +220,7 @@ function UploadContent() {
                       <div className="col-span-2 aspect-[3/4] rounded-lg border-2 border-[#c5a059] relative overflow-hidden group">
                           <img src={previewUrls[0]} className="absolute inset-0 w-full h-full object-cover" />
                           <div className="absolute top-2 left-2 bg-[#c5a059] text-[#1a0505] text-[10px] font-bold px-2 py-1 rounded">MAIN</div>
-                          <button type="button" onClick={() => removeImage(0)} className="absolute top-2 right-2 bg-black/60 p-1 rounded-full text-white hover:bg-red-600 transition-colors z-20"><XIcon /></button>
+                          <button type="button" onClick={() => removeImage(0)} className="absolute top-2 right-2 bg-black/60 p-1 rounded-full text-white hover:bg-red-600 transition-colors z-20"><XIcon className="h-4 w-4" /></button>
                       </div>
                   ) : (
                       <label className="col-span-2 aspect-[3/4] rounded-lg border-2 border-dashed border-[#e5d5a3]/20 flex flex-col items-center justify-center bg-[#2a0808]/30 cursor-pointer hover:border-[#c5a059] hover:bg-[#2a0808]/60 transition-all group">
@@ -231,7 +235,7 @@ function UploadContent() {
                           {previewUrls[i] ? (
                               <>
                                   <img src={previewUrls[i]} className="absolute inset-0 w-full h-full object-cover" />
-                                  <button type="button" onClick={() => removeImage(i)} className="absolute top-1 right-1 bg-black/60 p-1 rounded-full text-white hover:bg-red-600 transition-colors z-20"><XIcon /></button>
+                                  <button type="button" onClick={() => removeImage(i)} className="absolute top-1 right-1 bg-black/60 p-1 rounded-full text-white hover:bg-red-600 transition-colors z-20"><XIcon className="h-4 w-4" /></button>
                               </>
                           ) : (
                               <span className="text-[#e5d5a3]/20 text-xs font-mono">{i + 1}</span>
@@ -254,53 +258,72 @@ function UploadContent() {
                   <label className="block text-xs uppercase tracking-widest text-[#e5d5a3]/50 mb-2">Product Name</label>
                   <input required value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Royal Emerald Choker" className="w-full bg-[#2a0808] border border-[#e5d5a3]/20 p-4 text-[#e5d5a3] focus:border-[#c5a059] outline-none rounded transition-all" />
               </div>
+              
               <div className="grid grid-cols-2 gap-6 relative">
                   <div>
                       <label className="block text-xs uppercase tracking-widest text-[#e5d5a3]/50 mb-2">Price (₹)</label>
                       <input required type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="1500" className="w-full bg-[#2a0808] border border-[#e5d5a3]/20 p-4 text-[#e5d5a3] focus:border-[#c5a059] outline-none rounded transition-all" />
                   </div>
-                  
-                  {/* CUSTOM HEADLESS DROPDOWN */}
-                  <div className="relative">
-                      <label className="block text-xs uppercase tracking-widest text-[#e5d5a3]/50 mb-2">Category</label>
-                      <div 
-                          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                          className="w-full bg-[#2a0808] border border-[#e5d5a3]/20 p-4 text-[#e5d5a3] hover:border-[#c5a059] outline-none rounded transition-all cursor-pointer flex justify-between items-center"
-                      >
-                          <span>{category}</span>
-                          <ChevronDown className={`h-4 w-4 text-[#c5a059] transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                      </div>
-
-                      {isDropdownOpen && (
-                          <>
-                              <div className="fixed inset-0 z-10" onClick={() => setIsDropdownOpen(false)}></div>
-                              
-                              <div className="absolute z-20 w-full mt-2 bg-[#1a0505] border border-[#c5a059]/40 rounded max-h-[300px] overflow-y-auto shadow-[0_10px_40px_rgba(0,0,0,0.8)] custom-scrollbar">
-                                  {categoryGroups.map((group, gIdx) => (
-                                      <div key={gIdx}>
-                                          <div className="bg-[#2a0808] text-[#c5a059] font-bold tracking-widest text-[10px] p-3 uppercase sticky top-0 z-10 border-b border-t first:border-t-0 border-[#c5a059]/10 shadow-sm">
-                                              {group.name}
-                                          </div>
-                                          {group.items.map((item, iIdx) => (
-                                              <div 
-                                                  key={iIdx}
-                                                  onClick={() => { setCategory(item); setIsDropdownOpen(false); }}
-                                                  className={`p-3 text-sm cursor-pointer transition-all duration-200 pl-6 ${
-                                                      category === item 
-                                                      ? 'bg-[#c5a059] text-[#1a0505] font-bold' 
-                                                      : 'text-[#e5d5a3] hover:bg-[#c5a059]/20 hover:text-white'
-                                                  }`}
-                                              >
-                                                  {item}
-                                              </div>
-                                          ))}
-                                      </div>
-                                  ))}
-                              </div>
-                          </>
-                      )}
+                  <div>
+                      <label className="block text-xs uppercase tracking-widest text-[#e5d5a3]/50 mb-2">Discount (%)</label>
+                      <input type="number" min="0" max="100" value={discount} onChange={e => setDiscount(e.target.value)} placeholder="e.g. 20" className="w-full bg-[#2a0808] border border-[#e5d5a3]/20 p-4 text-[#e5d5a3] focus:border-[#c5a059] outline-none rounded transition-all" />
                   </div>
               </div>
+
+              {/* 🌟 NEW: REAL-TIME DISCOUNT PREVIEW 🌟 */}
+              {parseFloat(price) > 0 && parseFloat(discount) > 0 && (
+                  <div className="bg-[#c5a059]/10 border border-[#c5a059]/30 p-4 rounded flex justify-between items-center shadow-inner animate-fade-in">
+                      <span className="text-[#c5a059] text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4" /> Live Preview
+                      </span>
+                      <div className="flex gap-3 items-center font-sans">
+                          <span className="text-[#e5d5a3]/40 line-through text-sm">₹{parseFloat(price).toLocaleString("en-IN")}</span>
+                          <span className="text-[#c5a059] font-bold text-xl">₹{Math.round(parseFloat(price) - (parseFloat(price) * (parseFloat(discount) / 100))).toLocaleString("en-IN")}</span>
+                      </div>
+                  </div>
+              )}
+              
+              {/* CUSTOM HEADLESS DROPDOWN */}
+              <div className="relative">
+                  <label className="block text-xs uppercase tracking-widest text-[#e5d5a3]/50 mb-2">Category</label>
+                  <div 
+                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                      className="w-full bg-[#2a0808] border border-[#e5d5a3]/20 p-4 text-[#e5d5a3] hover:border-[#c5a059] outline-none rounded transition-all cursor-pointer flex justify-between items-center"
+                  >
+                      <span>{category}</span>
+                      <ChevronDown className={`h-4 w-4 text-[#c5a059] transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                  </div>
+
+                  {isDropdownOpen && (
+                      <>
+                          <div className="fixed inset-0 z-10" onClick={() => setIsDropdownOpen(false)}></div>
+                          
+                          <div className="absolute z-20 w-full mt-2 bg-[#1a0505] border border-[#c5a059]/40 rounded max-h-[300px] overflow-y-auto shadow-[0_10px_40px_rgba(0,0,0,0.8)] custom-scrollbar">
+                              {categoryGroups.map((group, gIdx) => (
+                                  <div key={gIdx}>
+                                      <div className="bg-[#2a0808] text-[#c5a059] font-bold tracking-widest text-[10px] p-3 uppercase sticky top-0 z-10 border-b border-t first:border-t-0 border-[#c5a059]/10 shadow-sm">
+                                          {group.name}
+                                      </div>
+                                      {group.items.map((item, iIdx) => (
+                                          <div 
+                                              key={iIdx}
+                                              onClick={() => { setCategory(item); setIsDropdownOpen(false); }}
+                                              className={`p-3 text-sm cursor-pointer transition-all duration-200 pl-6 ${
+                                                  category === item 
+                                                  ? 'bg-[#c5a059] text-[#1a0505] font-bold' 
+                                                  : 'text-[#e5d5a3] hover:bg-[#c5a059]/20 hover:text-white'
+                                              }`}
+                                          >
+                                              {item}
+                                          </div>
+                                      ))}
+                                  </div>
+                              ))}
+                          </div>
+                      </>
+                  )}
+              </div>
+              
               <div>
                   <label className="block text-xs uppercase tracking-widest text-[#e5d5a3]/50 mb-2">Description</label>
                   <textarea required value={description} onChange={e => setDescription(e.target.value)} rows={5} placeholder="Write something emotional..." className="w-full bg-[#2a0808] border border-[#e5d5a3]/20 p-4 text-[#e5d5a3] focus:border-[#c5a059] outline-none rounded transition-all resize-none" />
