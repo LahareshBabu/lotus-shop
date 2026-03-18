@@ -81,31 +81,6 @@ function TrashIcon({ className = "h-4 w-4" }: { className?: string }) { return <
 function ArrowUpRight({ className = "h-3 w-3" }: { className?: string }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" /></svg> }
 
 // 3. COMPONENTS
-function SubscribeForm() {
-  const [email, setEmail] = useState("")
-  const [status, setStatus] = useState("idle") 
-
-  const handleSubscribe = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setStatus("loading")
-    if (!email.includes("@")) { setStatus("error"); return }
-    const { error } = await supabase.from('subscribers').insert({ email })
-    if (error) { console.error(error); setStatus("error") } 
-    else { setStatus("success"); setEmail("") }
-  }
-
-  if (status === "success") {
-    return <div className="p-4 border border-[#c5a059] bg-[#c5a059]/10 rounded text-center animate-pulse"><p className="text-[#f4e4bc] font-serif text-lg">Welcome to the Royal Family.</p></div>
-  }
-
-  return (
-    <form onSubmit={handleSubscribe} className="flex w-full max-w-md gap-0 relative">
-      <input type="email" required placeholder="Your email address" value={email} onChange={(e) => setEmail(e.target.value)} disabled={status === "loading"} className="flex-1 border border-[#e5d5a3]/20 bg-[#2a0808] px-4 py-3 font-sans text-sm text-[#e5d5a3] placeholder-[#e5d5a3]/30 outline-none focus:border-[#e5d5a3]/60 disabled:opacity-50 rounded-l" />
-      <button disabled={status === "loading"} className="bg-[#e5d5a3] px-6 py-3 font-sans text-sm font-bold uppercase tracking-wider text-[#1a0505] hover:bg-white disabled:opacity-70 transition-colors rounded-r">{status === "loading" ? "Joining..." : "Subscribe"}</button>
-    </form>
-  )
-}
-
 function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, index = 0 }: any) {
   const [addedEffect, setAddedEffect] = useState(false)
   const [imgLoaded, setImgLoaded] = useState(false)
@@ -149,22 +124,37 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
         className="group relative flex flex-col overflow-hidden bg-[#2a0808] border border-[#e5d5a3]/20 rounded transition-all duration-500 ease-out hover:-translate-y-2 hover:z-20 hover:shadow-[0_15px_40px_rgba(197,160,89,0.15)] hover:border-[#c5a059]/50 animate-fade-up-stagger"
         style={{ animationDelay: `${index * 100}ms` }}
     >
-      <div className="relative aspect-[3/4] overflow-hidden bg-[#1a0505] flex items-center justify-center rounded-t cursor-pointer">
+      <div className={`relative aspect-[3/4] overflow-hidden bg-[#1a0505] flex items-center justify-center rounded-t ${product.is_sold_out ? 'cursor-default' : 'group cursor-pointer'}`}>
         {/* 🚀 AI TRACKER ATTACHED: Logs when a user clicks to view a product */}
         <Link href={`/product/${product.id}`} className="absolute inset-0 z-0" onClick={() => trackInteraction('view')}>
-            {product.image_url ? 
-                <img 
-                    src={product.image_url} 
-                    alt={product.name} 
-                    onLoad={() => setImgLoaded(true)}
-                    className={`h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 ${imgLoaded ? 'opacity-100' : 'opacity-0 blur-sm'} transition-all`} 
-                /> 
-            : 
-                <div className="flex flex-col items-center justify-center text-[#e5d5a3]/30 h-full"><span className="font-serif text-lg tracking-widest">IMAGE</span></div>
-            }
+            
+            {/* 🌟 FIX: DEDICATED WRAPPER FOR GRAYSCALE TO PREVENT CSS CONFLICTS 🌟 */}
+            <div className={`absolute inset-0 ${product.is_sold_out ? 'grayscale opacity-50' : ''}`}>
+                {product.image_url ? 
+                    <img 
+                        src={product.image_url} 
+                        alt={product.name} 
+                        onLoad={() => setImgLoaded(true)}
+                        className={`h-full w-full object-cover transition-transform duration-700 ease-out ${!product.is_sold_out ? 'group-hover:scale-105' : ''} ${imgLoaded ? 'opacity-100' : 'opacity-0 blur-sm'} transition-all`} 
+                    /> 
+                : 
+                    <div className="flex flex-col items-center justify-center text-[#e5d5a3]/30 h-full"><span className="font-serif text-lg tracking-widest">IMAGE</span></div>
+                }
+            </div>
+
+            {/* 🌟 ELITE SOLD OUT OVERLAY (CAROUSEL) 🌟 */}
+            {product.is_sold_out && (
+                <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                    <div className="w-full bg-[#1a0505]/80 border-y border-[#c5a059]/30 py-3 flex justify-center shadow-lg">
+                        <span className="text-[#c5a059] text-[10px] font-bold uppercase tracking-[0.3em] ml-[0.3em]">
+                            Sold Out
+                        </span>
+                    </div>
+                </div>
+            )}
         </Link>
 
-        {product.id === 1 && <span className="absolute left-3 top-3 bg-[#e5d5a3] px-3 py-1 font-sans text-[10px] font-bold uppercase text-[#1a0505] rounded-sm z-10 shadow-lg">BESTSELLER</span>}
+        {product.id === 1 && !product.is_sold_out && <span className="absolute left-3 top-3 bg-[#e5d5a3] px-3 py-1 font-sans text-[10px] font-bold uppercase text-[#1a0505] rounded-sm z-10 shadow-lg">BESTSELLER</span>}
         
         <button onClick={handleWishlistClick} className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-[#1a0505]/60 backdrop-blur-md hover:bg-[#e5d5a3] hover:text-[#1a0505] text-[#e5d5a3] border border-[#e5d5a3]/30 z-20 transition-colors duration-300">
             {isGlittering && (
@@ -177,31 +167,37 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
             <HeartIcon className={`h-4 w-4 relative z-10 transition-transform duration-300 group-hover:scale-110 ${isWishlisted ? "fill-red-600 text-red-600" : ""}`} filled={isWishlisted} />
         </button>
 
-        <div className="absolute inset-x-0 bottom-0 z-20 translate-y-full transition-transform duration-300 ease-out group-hover:translate-y-0">
-            <button 
-                onClick={(e) => { 
-                    e.preventDefault(); 
-                    onAddToCart(product); 
-                    setAddedEffect(true); 
-                    setTimeout(() => setAddedEffect(false), 2000); 
-                    // 🚀 AI TRACKER ATTACHED: Logs an Add To Cart event!
-                    trackInteraction('add_to_cart');
-                }} 
-                className={`w-full py-3 font-sans text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-300 ${addedEffect ? "bg-green-700 text-white" : "bg-[#e5d5a3]/90 backdrop-blur text-[#1a0505] hover:bg-white"}`}
-            >
-                {addedEffect ? (
-                    <div className="flex items-center gap-2"><CheckIcon className="h-5 w-5 animate-check" /> <span className="animate-pulse">Added</span></div>
-                ) : (
-                    <><ShoppingBagIcon className="h-4 w-4" /> Add to Cart</>
-                )}
-            </button>
+        <div className={`absolute inset-x-0 bottom-0 z-20 ${product.is_sold_out ? '' : 'translate-y-full group-hover:translate-y-0'} transition-transform duration-300 ease-out`}>
+            {product.is_sold_out ? (
+                <div className="w-full py-3 font-sans text-[10px] font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-2 bg-[#1a0505] text-[#c5a059]/40 border-t border-[#c5a059]/20 cursor-not-allowed">
+                    Out of Stock
+                </div>
+            ) : (
+                <button 
+                    onClick={(e) => { 
+                        e.preventDefault(); 
+                        onAddToCart(product); 
+                        setAddedEffect(true); 
+                        setTimeout(() => setAddedEffect(false), 2000); 
+                        // 🚀 AI TRACKER ATTACHED: Logs an Add To Cart event!
+                        trackInteraction('add_to_cart');
+                    }} 
+                    className={`w-full py-3 font-sans text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-300 ${addedEffect ? "bg-green-700 text-white" : "bg-[#e5d5a3]/90 backdrop-blur text-[#1a0505] hover:bg-white"}`}
+                >
+                    {addedEffect ? (
+                        <div className="flex items-center gap-2"><CheckIcon className="h-5 w-5 animate-check" /> <span className="animate-pulse">Added</span></div>
+                    ) : (
+                        <><ShoppingBagIcon className="h-4 w-4" /> Add to Cart</>
+                    )}
+                </button>
+            )}
         </div>
       </div>
       
-      <div className="flex flex-1 flex-col gap-2 p-5 bg-gradient-to-b from-[#2a0808] to-[#1a0505]">
+      <div className={`flex flex-1 flex-col gap-2 p-5 bg-gradient-to-b from-[#2a0808] to-[#1a0505] ${product.is_sold_out ? 'opacity-70' : ''}`}>
         {/* 🚀 AI TRACKER ATTACHED: Logs when a user clicks the title link */}
         <Link href={`/product/${product.id}`} className="hover:text-[#c5a059] transition-colors duration-300" onClick={() => trackInteraction('view')}>
-            <h3 className="font-serif text-lg font-medium tracking-wide text-[#e5d5a3]">{product.name}</h3>
+            <h3 className="font-serif text-lg font-medium tracking-wide text-[#e5d5a3] line-clamp-1">{product.name}</h3>
         </Link>
         <p className="font-sans text-base font-bold text-[#f4e4bc]">₹{product.price.toLocaleString("en-IN")}</p>
       </div>
@@ -305,6 +301,7 @@ export default function Page() {
   const handleLogin = async (e: React.FormEvent) => { e.preventDefault(); setLoadingLogin(true); const { error } = await supabase.auth.signInWithOtp({ email }); if (error) { setLoginMessage("Error: " + error.message) } else { setLoginMessage("Magic Link sent! Check your email.") } setLoadingLogin(false) }
   
   const addToCart = (product: any) => { 
+      if (product.is_sold_out) return; // Safety lock
       const existingItemIndex = cart.findIndex(item => item.id === product.id)
       let newCart;
       if (existingItemIndex > -1) {
@@ -470,7 +467,7 @@ export default function Page() {
               <Link href="/wishlist" className="block w-full text-center bg-[#e5d5a3] py-3 font-sans text-xs font-bold uppercase tracking-widest text-[#1a0505] hover:bg-white transition-colors shadow-lg rounded">View Full Wishlist</Link>
           </div>
       </div>
-      
+
       <div className={`fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isCartOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsCartOpen(false)} />
       <div className={`fixed top-0 right-0 z-50 h-full w-full max-w-sm bg-[#2a0808] border-l border-[#e5d5a3]/20 shadow-2xl transition-transform duration-300 transform ${isCartOpen ? 'translate-x-0' : 'translate-x-full'} flex flex-col`}>
           <div className="flex items-center justify-between p-6 border-b border-[#e5d5a3]/10 pb-4"><h2 className="font-serif text-xl font-bold tracking-wide text-[#f4e4bc]">Your Bag ({cart.length})</h2><button onClick={() => setIsCartOpen(false)} className="text-[#e5d5a3]/60 hover:text-white"><XIcon className="w-6 h-6" /></button></div>
@@ -506,7 +503,6 @@ export default function Page() {
       </section>
 
       <footer id="footer" className="bg-[#0f0303] text-[#e5d5a3] border-t border-[#e5d5a3]/10">
-        <div className="border-b border-[#e5d5a3]/10"><div className="mx-auto flex max-w-7xl flex-col items-center gap-6 px-4 py-16 text-center"><h3 className="font-serif text-3xl font-medium tracking-wide text-[#f4e4bc]">Join the Royal Family</h3><p className="max-w-md font-sans text-sm text-[#e5d5a3]/50">Subscribe to receive exclusive updates on new arrivals.</p><SubscribeForm /></div></div>
         <div className="mx-auto grid max-w-7xl grid-cols-1 gap-12 px-4 py-16 sm:grid-cols-2 lg:grid-cols-4 lg:px-8 text-left">
           <div><span className="font-serif text-xl font-bold tracking-widest text-[#e5d5a3]">LOTUS</span><p className="mt-4 font-sans text-sm leading-relaxed text-[#e5d5a3]/50">Premium imitation jewelry.</p></div>
           

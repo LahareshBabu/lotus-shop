@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -34,7 +34,7 @@ function PlusIcon({ className="h-5 w-5" }) { return <svg className={className} f
 function EditIcon({ className="h-4 w-4" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg> }
 function WarningIcon({ className="h-12 w-12" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg> }
 
-export default function AccountPage() {
+function AccountContent() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -44,6 +44,9 @@ export default function AccountPage() {
   const [orders, setOrders] = useState<any[]>([])
   const [recentlyViewed, setRecentlyViewed] = useState<any[]>([])
   
+  // 🌟 NEW: Memory Ref for Scroll Position
+  const ordersScrollRef = useRef<HTMLDivElement>(null)
+
   // FORM STATES
   const [showAddressForm, setShowAddressForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -61,8 +64,13 @@ export default function AccountPage() {
   const stateDropdownRef = useRef<HTMLDivElement>(null)
   const cityDropdownRef = useRef<HTMLDivElement>(null)
 
+  // 🌟 NEW: Initialize State from Memory 🌟
   useEffect(() => {
     async function init() {
+      // 1. Restore Tab Memory
+      const savedTab = sessionStorage.getItem('lotus_account_tab')
+      if (savedTab) setActiveTab(savedTab)
+
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/'); return }
       setUser(session.user)
@@ -85,9 +93,39 @@ export default function AccountPage() {
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [])
+  }, [router])
 
-  const handleLogout = async () => { await supabase.auth.signOut(); router.push('/') }
+  // 🌟 NEW: Restore Scroll Position Memory 🌟
+  useEffect(() => {
+      if (activeTab === 'orders' && orders.length > 0) {
+          const savedScroll = sessionStorage.getItem('lotus_orders_scroll')
+          if (savedScroll && ordersScrollRef.current) {
+              // requestAnimationFrame ensures the DOM is painted before scrolling
+              requestAnimationFrame(() => {
+                  if (ordersScrollRef.current) {
+                      ordersScrollRef.current.scrollTop = parseInt(savedScroll, 10)
+                  }
+              })
+          }
+      }
+  }, [activeTab, orders])
+
+  // 🌟 NEW: Save Tab Memory 🌟
+  const switchTab = (tab: string) => {
+      setActiveTab(tab)
+      sessionStorage.setItem('lotus_account_tab', tab)
+      if (tab !== 'orders') {
+          sessionStorage.removeItem('lotus_orders_scroll') // Clear scroll if leaving manually
+      }
+  }
+
+  const handleLogout = async () => { 
+      sessionStorage.removeItem('lotus_account_tab')
+      sessionStorage.removeItem('lotus_orders_scroll')
+      await supabase.auth.signOut() 
+      router.push('/') 
+  }
+  
   const handleDeleteAccount = async () => { if(window.confirm("Are you sure?")) alert("Account deletion requested.") }
   
   const handleDeleteAddress = async (id: string) => { 
@@ -96,18 +134,13 @@ export default function AccountPage() {
       setAddresses(addresses.filter(a => a.id !== id)) 
   }
 
-  const requestDeleteOrder = (id: string) => {
-      setOrderToDelete(id)
-  }
+  const requestDeleteOrder = (id: string) => setOrderToDelete(id)
 
   const confirmDeleteOrder = async () => {
       if (!orderToDelete) return
       const { error } = await supabase.from('orders').delete().eq('id', orderToDelete)
-      if (!error) {
-          setOrders(orders.filter(o => o.id !== orderToDelete))
-      } else {
-          alert("Could not remove order.")
-      }
+      if (!error) { setOrders(orders.filter(o => o.id !== orderToDelete)) } 
+      else { alert("Could not remove order.") }
       setOrderToDelete(null) 
   }
 
@@ -127,7 +160,7 @@ export default function AccountPage() {
   }
   
   const goBackToDashboard = () => {
-      setActiveTab('dashboard')
+      switchTab('dashboard')
       setShowAddressForm(false)
       setEditingId(null)
       setShowStateDropdown(false)
@@ -182,18 +215,8 @@ export default function AccountPage() {
                       Are you sure you want to remove this delivered order from your history? This action cannot be undone.
                   </p>
                   <div className="flex gap-4 justify-center">
-                      <button 
-                          onClick={() => setOrderToDelete(null)} 
-                          className="px-6 py-3 border border-[#e5d5a3]/30 rounded text-[#e5d5a3] text-xs font-bold uppercase tracking-widest hover:border-[#e5d5a3] transition-all"
-                      >
-                          Cancel
-                      </button>
-                      <button 
-                          onClick={confirmDeleteOrder} 
-                          className="px-6 py-3 bg-red-900/80 border border-red-500/50 rounded text-red-100 text-xs font-bold uppercase tracking-widest hover:bg-red-800 hover:border-red-500 transition-all shadow-lg"
-                      >
-                          Yes, Remove
-                      </button>
+                      <button onClick={() => setOrderToDelete(null)} className="px-6 py-3 border border-[#e5d5a3]/30 rounded text-[#e5d5a3] text-xs font-bold uppercase tracking-widest hover:border-[#e5d5a3] transition-all">Cancel</button>
+                      <button onClick={confirmDeleteOrder} className="px-6 py-3 bg-red-900/80 border border-red-500/50 rounded text-red-100 text-xs font-bold uppercase tracking-widest hover:bg-red-800 hover:border-red-500 transition-all shadow-lg">Yes, Remove</button>
                   </div>
               </div>
           </div>
@@ -214,15 +237,15 @@ export default function AccountPage() {
         {/* DASHBOARD GRID */}
         {activeTab === 'dashboard' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div onClick={() => setActiveTab('orders')} className="bg-[#2a0808] border border-[#e5d5a3]/20 p-6 rounded hover:border-[#c5a059] cursor-pointer transition-all flex items-center gap-4 group">
+            <div onClick={() => switchTab('orders')} className="bg-[#2a0808] border border-[#e5d5a3]/20 p-6 rounded hover:border-[#c5a059] cursor-pointer transition-all flex items-center gap-4 group">
               <div className="p-3 bg-[#1a0505] rounded-full text-[#c5a059] group-hover:scale-110 transition-transform"><BoxIcon /></div>
               <div><h3 className="font-serif text-lg text-[#f4e4bc]">Your Orders</h3><p className="text-xs text-[#e5d5a3]/50">Track, return, or buy things again.</p></div>
             </div>
-            <div onClick={() => setActiveTab('addresses')} className="bg-[#2a0808] border border-[#e5d5a3]/20 p-6 rounded hover:border-[#c5a059] cursor-pointer transition-all flex items-center gap-4 group">
+            <div onClick={() => switchTab('addresses')} className="bg-[#2a0808] border border-[#e5d5a3]/20 p-6 rounded hover:border-[#c5a059] cursor-pointer transition-all flex items-center gap-4 group">
               <div className="p-3 bg-[#1a0505] rounded-full text-[#c5a059] group-hover:scale-110 transition-transform"><MapIcon /></div>
               <div><h3 className="font-serif text-lg text-[#f4e4bc]">Your Addresses</h3><p className="text-xs text-[#e5d5a3]/50">Edit addresses for orders.</p></div>
             </div>
-            <div onClick={() => setActiveTab('security')} className="bg-[#2a0808] border border-[#e5d5a3]/20 p-6 rounded hover:border-[#c5a059] cursor-pointer transition-all flex items-center gap-4 group">
+            <div onClick={() => switchTab('security')} className="bg-[#2a0808] border border-[#e5d5a3]/20 p-6 rounded hover:border-[#c5a059] cursor-pointer transition-all flex items-center gap-4 group">
               <div className="p-3 bg-[#1a0505] rounded-full text-[#c5a059] group-hover:scale-110 transition-transform"><ShieldIcon /></div>
               <div><h3 className="font-serif text-lg text-[#f4e4bc]">Login & Security</h3><p className="text-xs text-[#e5d5a3]/50">Manage account settings.</p></div>
             </div>
@@ -240,16 +263,18 @@ export default function AccountPage() {
             {orders.length === 0 ? (
               <div className="p-8 border border-dashed border-[#e5d5a3]/20 rounded text-center text-[#e5d5a3]/40 italic">You haven't placed any orders yet.</div>
             ) : (
-              <div className="space-y-8 max-h-[700px] overflow-y-auto pr-2 custom-scrollbar">
-                
+              // 🌟 NEW: Scroll Memory Event Attached Here
+              <div 
+                  ref={ordersScrollRef} 
+                  onScroll={(e) => sessionStorage.setItem('lotus_orders_scroll', e.currentTarget.scrollTop.toString())}
+                  className="space-y-8 max-h-[700px] overflow-y-auto pr-2 custom-scrollbar"
+              >
                 {orders.map(order => {
                   const products = Array.isArray(order.items?.products) ? order.items.products : (Array.isArray(order.items) ? order.items : []);
                   const isFullyDelivered = order.status === 'Delivered';
 
                   return (
                       <div key={order.id} className="bg-[#2a0808] p-6 rounded border border-[#e5d5a3]/20 shadow-lg relative">
-                          
-                          {/* Order Header - completely stripped of generic Order ID text */}
                           <div className="flex justify-between items-start border-b border-[#e5d5a3]/10 pb-4 mb-6">
                               <div>
                                   <p className="text-[#e5d5a3]/50 text-xs uppercase tracking-widest mb-1">Purchased On</p>
@@ -261,11 +286,7 @@ export default function AccountPage() {
                               </div>
                               <div className="text-right">
                                   {isFullyDelivered && (
-                                      <button 
-                                          onClick={() => requestDeleteOrder(order.id)} 
-                                          className="text-red-500 hover:text-white hover:bg-red-500 p-2 rounded transition-colors border border-red-500/20 text-xs uppercase tracking-widest font-bold"
-                                          title="Remove entirely from history"
-                                      >
+                                      <button onClick={() => requestDeleteOrder(order.id)} className="text-red-500 hover:text-white hover:bg-red-500 p-2 rounded transition-colors border border-red-500/20 text-xs uppercase tracking-widest font-bold" title="Remove entirely from history">
                                           Clear History
                                       </button>
                                   )}
@@ -274,31 +295,26 @@ export default function AccountPage() {
 
                           <div className="space-y-6">
                               {products.map((item: any, idx: number) => {
-                                  
                                   let itemStatus = item.status || order.status || 'Order Placed';
                                   if (itemStatus === 'Processing') itemStatus = 'Order Placed';
                                   const isItemDelivered = itemStatus === 'Delivered';
                                   
-                                  // 🌟 THE FIX: Generate a professional, unique Tracking ID (e.g. TRK177331706189300) 🌟
                                   const baseId = order.id.replace('ORD-', '');
                                   const hexIndex = idx.toString(16).toUpperCase().padStart(2, '0');
                                   const trackingId = `TRK${baseId}${hexIndex}`;
 
                                   return (
                                       <div key={idx} className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-6 border-b border-[#e5d5a3]/5 last:border-0 last:pb-0">
-                                          
                                           <div className="flex gap-4 items-center w-full md:w-2/3">
                                               <div className="h-20 w-20 bg-[#1a0505] rounded overflow-hidden flex-shrink-0 border border-[#e5d5a3]/10">
                                                   {item.image_url ? <img src={item.image_url} className="h-full w-full object-cover" /> : <div className="h-full w-full flex items-center justify-center text-[8px] text-[#e5d5a3]/30">NO IMAGE</div>}
                                               </div>
                                               <div className="flex-1">
                                                   <h4 className="text-[#f4e4bc] font-serif text-lg leading-tight mb-1">{item.name}</h4>
-                                                  
                                                   <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mb-2">
-                                                    <p className="text-[#e5d5a3]/50 text-xs">Qty: {item.quantity || 1}</p>
-                                                    <p className="text-[#e5d5a3]/50 text-xs">Tracking ID: <span className="font-mono text-[#c5a059]">{trackingId}</span></p>
+                                                      <p className="text-[#e5d5a3]/50 text-xs">Qty: {item.quantity || 1}</p>
+                                                      <p className="text-[#e5d5a3]/50 text-xs">Tracking ID: <span className="font-mono text-[#c5a059]">{trackingId}</span></p>
                                                   </div>
-                                                  
                                                   <span className={`inline-block text-[9px] px-2 py-1 rounded uppercase tracking-widest font-bold border ${isItemDelivered ? 'text-green-400 border-green-900/30 bg-green-900/10' : 'text-[#c5a059] border-[#c5a059]/30 bg-[#c5a059]/10'}`}>
                                                       {itemStatus}
                                                   </span>
@@ -307,19 +323,16 @@ export default function AccountPage() {
                                           
                                           <div className="flex flex-col items-end gap-3 w-full md:w-1/3">
                                               <p className="font-bold text-lg text-[#f4e4bc]">₹{(item.price || 0).toLocaleString("en-IN")}</p>
-                                              
                                               {!isItemDelivered && (
-                                                  <Link href={`/track?id=${trackingId}`} className="bg-transparent border border-[#c5a059] text-[#c5a059] px-6 py-2 rounded font-bold uppercase text-[10px] tracking-widest hover:bg-[#c5a059] hover:text-[#1a0505] transition-all text-center whitespace-nowrap w-full md:w-auto">
+                                                  <Link href={`/track?id=${trackingId}&tab=orders`} className="bg-transparent border border-[#c5a059] text-[#c5a059] px-6 py-2 rounded font-bold uppercase text-[10px] tracking-widest hover:bg-[#c5a059] hover:text-[#1a0505] transition-all text-center whitespace-nowrap w-full md:w-auto">
                                                       Track Item
                                                   </Link>
                                               )}
                                           </div>
-                                          
                                       </div>
                                   )
                               })}
                           </div>
-
                       </div>
                   )
                 })}
@@ -408,5 +421,13 @@ export default function AccountPage() {
 
       </div>
     </div>
+  )
+}
+
+export default function AccountWrapper() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#1a0505] flex items-center justify-center text-[#c5a059] font-serif">Loading your royal profile...</div>}>
+      <AccountContent />
+    </Suspense>
   )
 }

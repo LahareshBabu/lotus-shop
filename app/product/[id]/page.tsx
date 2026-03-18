@@ -59,11 +59,15 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, rec
     <article className="shrink-0 w-full sm:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-4.5rem)/4)] snap-start group relative flex flex-col overflow-hidden bg-[#2a0808] border border-[#e5d5a3]/20 transition-all duration-300 hover:border-[#e5d5a3]/60 hover:shadow-2xl rounded">
       <div className={`relative aspect-[3/4] overflow-hidden bg-[#1a0505] flex items-center justify-center rounded-t ${product.is_sold_out ? 'cursor-default' : 'group cursor-pointer'}`}>
         <Link href={`/product/${product.id}?ref=${recommendationModel}`} className="absolute inset-0 z-0" onClick={() => trackInteraction('view')}>
-            {product.image_url ? 
-                <img src={product.image_url} alt={product.name} onLoad={() => setImgLoaded(true)} className={`h-full w-full object-cover transition-transform duration-500 ${!product.is_sold_out ? 'group-hover:scale-110' : ''} ${imgLoaded ? 'image-loaded' : 'image-loading'} ${product.is_sold_out ? 'grayscale opacity-70' : ''}`} /> 
-            : 
-                <div className="flex flex-col items-center justify-center text-[#e5d5a3]/30 h-full"><span className="font-serif text-lg tracking-widest">IMAGE</span></div>
-            }
+            
+            {/* 🌟 FIX: DEDICATED WRAPPER FOR GRAYSCALE TO PREVENT CSS CONFLICTS 🌟 */}
+            <div className={`absolute inset-0 ${product.is_sold_out ? 'grayscale opacity-50' : ''}`}>
+                {product.image_url ? 
+                    <img src={product.image_url} alt={product.name} onLoad={() => setImgLoaded(true)} className={`h-full w-full object-cover transition-transform duration-500 ${!product.is_sold_out ? 'group-hover:scale-110' : ''} ${imgLoaded ? 'image-loaded' : 'image-loading'}`} /> 
+                : 
+                    <div className="flex flex-col items-center justify-center text-[#e5d5a3]/30 h-full"><span className="font-serif text-lg tracking-widest">IMAGE</span></div>
+                }
+            </div>
             
             {/* 🌟 ELITE SOLD OUT OVERLAY (CAROUSEL) 🌟 */}
             {product.is_sold_out && (
@@ -245,8 +249,12 @@ export default function ProductPage() {
                 const recId = fbtData.recommended_item_id;
                 if (recId) {
                     const { data: fbtItem } = await supabase.from('products').select('*').eq('id', recId).single();
-                    if (fbtItem && !fbtItem.is_sold_out) { // Don't recommend sold out items as FBT
+                    if (fbtItem) { 
                         setFbtProduct(fbtItem);
+                        // If it's sold out, don't auto-select it in the bundle
+                        if (fbtItem.is_sold_out) {
+                            setBundleSelection(p => ({...p, fbt: false}))
+                        }
                     }
                 }
             }
@@ -539,7 +547,7 @@ export default function ProductPage() {
           </div>
       )}
 
-      {!fbtLoading && fbtProduct && !product.is_sold_out && !fbtProduct.is_sold_out && (
+      {!fbtLoading && fbtProduct && (
           <section className="w-full py-12 md:py-16 border-t border-[#e5d5a3]/10 bg-gradient-to-b from-[#1a0505] to-[#2a0808]/20 relative overflow-hidden">
               {/* Subtle Background Glow */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl h-full bg-[#c5a059]/5 blur-[120px] rounded-full pointer-events-none"></div>
@@ -552,18 +560,32 @@ export default function ProductPage() {
                       {/* Images Flow */}
                       <div className="flex items-center gap-4 md:gap-8 overflow-x-auto pb-4 w-full lg:w-auto [&::-webkit-scrollbar]:hidden">
                           {/* Main Item */}
-                          <div className={`relative shrink-0 transition-all duration-500 ${!bundleSelection.main ? 'opacity-40 grayscale scale-95' : 'scale-100 shadow-[0_0_20px_rgba(197,160,89,0.15)]'}`}>
-                              <div className="block h-32 w-32 md:h-48 md:w-48 bg-[#2a0808] rounded border border-[#c5a059]/30 overflow-hidden">
-                                  <img src={product.image_url} className="h-full w-full object-cover" />
+                          <div className={`relative shrink-0 transition-all duration-500 ${!bundleSelection.main || product.is_sold_out ? 'opacity-40 grayscale scale-95' : 'scale-100 shadow-[0_0_20px_rgba(197,160,89,0.15)]'}`}>
+                              <div className="block h-32 w-32 md:h-48 md:w-48 bg-[#2a0808] rounded border border-[#c5a059]/30 overflow-hidden relative">
+                                  <img src={product.image_url} className={`h-full w-full object-cover ${product.is_sold_out ? 'grayscale opacity-70' : ''}`} />
+                                  {product.is_sold_out && (
+                                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                          <div className="w-full bg-[#1a0505]/80 py-2 flex justify-center">
+                                              <span className="text-[#c5a059] text-[8px] md:text-[10px] font-bold uppercase tracking-[0.3em] ml-[0.3em]">Sold Out</span>
+                                          </div>
+                                      </div>
+                                  )}
                               </div>
                           </div>
                           
                           <div className="text-[#c5a059] font-light text-2xl md:text-3xl shrink-0">+</div>
                           
                           {/* FBT Item */}
-                          <div className={`relative shrink-0 transition-all duration-500 ${!bundleSelection.fbt ? 'opacity-40 grayscale scale-95' : 'scale-100 shadow-[0_0_20px_rgba(197,160,89,0.15)]'}`}>
-                              <Link href={`/product/${fbtProduct.id}?ref=fbt_apriori`} className="block h-32 w-32 md:h-48 md:w-48 bg-[#2a0808] rounded border border-[#c5a059]/30 overflow-hidden group">
-                                  <img src={fbtProduct.image_url} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                          <div className={`relative shrink-0 transition-all duration-500 ${!bundleSelection.fbt || fbtProduct.is_sold_out ? 'opacity-40 grayscale scale-95' : 'scale-100 shadow-[0_0_20px_rgba(197,160,89,0.15)]'}`}>
+                              <Link href={`/product/${fbtProduct.id}?ref=fbt_apriori`} className="block h-32 w-32 md:h-48 md:w-48 bg-[#2a0808] rounded border border-[#c5a059]/30 overflow-hidden group relative">
+                                  <img src={fbtProduct.image_url} className={`h-full w-full object-cover ${fbtProduct.is_sold_out ? 'grayscale opacity-70' : 'group-hover:scale-110 transition-transform duration-700'}`} />
+                                  {fbtProduct.is_sold_out && (
+                                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                          <div className="w-full bg-[#1a0505]/80 py-2 flex justify-center">
+                                              <span className="text-[#c5a059] text-[8px] md:text-[10px] font-bold uppercase tracking-[0.3em] ml-[0.3em]">Sold Out</span>
+                                          </div>
+                                      </div>
+                                  )}
                               </Link>
                           </div>
                       </div>
@@ -573,35 +595,35 @@ export default function ProductPage() {
                           <div className="space-y-5 w-full md:w-auto">
                               
                               {/* Custom Luxury Checkbox 1 */}
-                              <label className="flex items-start gap-4 cursor-pointer group">
+                              <label className={`flex items-start gap-4 group ${product.is_sold_out ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                   <div className="relative flex items-center justify-center mt-1">
-                                      <input type="checkbox" checked={bundleSelection.main} onChange={() => setBundleSelection(p => ({...p, main: !p.main}))} className="peer sr-only" />
-                                      <div className="w-5 h-5 rounded border border-[#c5a059]/50 peer-checked:bg-[#c5a059] peer-checked:border-[#c5a059] transition-all flex items-center justify-center">
-                                          <CheckIcon className={`w-3 h-3 text-[#1a0505] transition-opacity ${bundleSelection.main ? 'opacity-100' : 'opacity-0'}`} />
+                                      <input type="checkbox" disabled={product.is_sold_out} checked={bundleSelection.main && !product.is_sold_out} onChange={() => setBundleSelection(p => ({...p, main: !p.main}))} className="peer sr-only" />
+                                      <div className={`w-5 h-5 rounded border transition-all flex items-center justify-center ${product.is_sold_out ? 'border-[#e5d5a3]/10 bg-[#2a0808]' : 'border-[#c5a059]/50 peer-checked:bg-[#c5a059] peer-checked:border-[#c5a059]'}`}>
+                                          <CheckIcon className={`w-3 h-3 text-[#1a0505] transition-opacity ${(bundleSelection.main && !product.is_sold_out) ? 'opacity-100' : 'opacity-0'}`} />
                                       </div>
                                   </div>
                                   <div className="flex flex-col">
-                                      <span className={`text-sm md:text-base font-bold transition-colors ${bundleSelection.main ? 'text-[#e5d5a3]' : 'text-[#e5d5a3]/50 line-through'}`}>
+                                      <span className={`text-sm md:text-base font-bold transition-colors ${(bundleSelection.main && !product.is_sold_out) ? 'text-[#e5d5a3]' : 'text-[#e5d5a3]/50 line-through'}`}>
                                           <span className="text-[#e5d5a3]/60 font-normal mr-2">This item:</span> 
                                           {product.name}
                                       </span>
-                                      <span className={`font-serif text-lg ${bundleSelection.main ? 'text-[#c5a059]' : 'text-[#c5a059]/50'}`}>₹{product.price.toLocaleString("en-IN")}</span>
+                                      <span className={`font-serif text-lg ${(bundleSelection.main && !product.is_sold_out) ? 'text-[#c5a059]' : 'text-[#c5a059]/50'}`}>₹{product.price.toLocaleString("en-IN")}</span>
                                   </div>
                               </label>
                               
                               {/* Custom Luxury Checkbox 2 */}
-                              <label className="flex items-start gap-4 cursor-pointer group">
+                              <label className={`flex items-start gap-4 group ${fbtProduct.is_sold_out ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                                   <div className="relative flex items-center justify-center mt-1">
-                                      <input type="checkbox" checked={bundleSelection.fbt} onChange={() => setBundleSelection(p => ({...p, fbt: !p.fbt}))} className="peer sr-only" />
-                                      <div className="w-5 h-5 rounded border border-[#c5a059]/50 peer-checked:bg-[#c5a059] peer-checked:border-[#c5a059] transition-all flex items-center justify-center">
-                                          <CheckIcon className={`w-3 h-3 text-[#1a0505] transition-opacity ${bundleSelection.fbt ? 'opacity-100' : 'opacity-0'}`} />
+                                      <input type="checkbox" disabled={fbtProduct.is_sold_out} checked={bundleSelection.fbt && !fbtProduct.is_sold_out} onChange={() => setBundleSelection(p => ({...p, fbt: !p.fbt}))} className="peer sr-only" />
+                                      <div className={`w-5 h-5 rounded border transition-all flex items-center justify-center ${fbtProduct.is_sold_out ? 'border-[#e5d5a3]/10 bg-[#2a0808]' : 'border-[#c5a059]/50 peer-checked:bg-[#c5a059] peer-checked:border-[#c5a059]'}`}>
+                                          <CheckIcon className={`w-3 h-3 text-[#1a0505] transition-opacity ${(bundleSelection.fbt && !fbtProduct.is_sold_out) ? 'opacity-100' : 'opacity-0'}`} />
                                       </div>
                                   </div>
                                   <div className="flex flex-col">
-                                      <Link href={`/product/${fbtProduct.id}?ref=fbt_apriori`} className={`text-sm md:text-base font-bold transition-colors ${bundleSelection.fbt ? 'text-[#e5d5a3] hover:text-[#c5a059]' : 'text-[#e5d5a3]/50 line-through'}`}>
+                                      <Link href={`/product/${fbtProduct.id}?ref=fbt_apriori`} className={`text-sm md:text-base font-bold transition-colors ${(bundleSelection.fbt && !fbtProduct.is_sold_out) ? 'text-[#e5d5a3] hover:text-[#c5a059]' : 'text-[#e5d5a3]/50 line-through'}`}>
                                           {fbtProduct.name}
                                       </Link>
-                                      <span className={`font-serif text-lg ${bundleSelection.fbt ? 'text-[#c5a059]' : 'text-[#c5a059]/50'}`}>₹{fbtProduct.price.toLocaleString("en-IN")}</span>
+                                      <span className={`font-serif text-lg ${(bundleSelection.fbt && !fbtProduct.is_sold_out) ? 'text-[#c5a059]' : 'text-[#c5a059]/50'}`}>₹{fbtProduct.price.toLocaleString("en-IN")}</span>
                                   </div>
                               </label>
                           </div>
@@ -610,13 +632,13 @@ export default function ProductPage() {
                               <div className="text-left md:text-right">
                                   <p className="text-[10px] uppercase tracking-widest text-[#e5d5a3]/50 mb-1">Total Bundle Price</p>
                                   <p className="text-4xl font-serif text-[#c5a059]">
-                                      ₹{((bundleSelection.main ? product.price : 0) + (bundleSelection.fbt ? fbtProduct.price : 0)).toLocaleString("en-IN")}
+                                      ₹{(((bundleSelection.main && !product.is_sold_out) ? product.price : 0) + ((bundleSelection.fbt && !fbtProduct.is_sold_out) ? fbtProduct.price : 0)).toLocaleString("en-IN")}
                                   </p>
                               </div>
                               <button 
                                   onClick={handleAddBundleToCart} 
-                                  disabled={addedBothToCart || (!bundleSelection.main && !bundleSelection.fbt)} 
-                                  className={`w-full md:w-auto px-8 py-4 font-bold uppercase tracking-widest whitespace-nowrap transition-all text-xs md:text-sm rounded shadow-[0_0_20px_rgba(197,160,89,0.2)] flex items-center justify-center gap-2 ${addedBothToCart ? "bg-green-800 text-white" : (!bundleSelection.main && !bundleSelection.fbt) ? "bg-[#2a0808] text-[#e5d5a3]/30 cursor-not-allowed shadow-none" : "bg-[#c5a059] text-[#1a0505] hover:bg-[#e5d5a3]"}`}
+                                  disabled={addedBothToCart || (!bundleSelection.main && !bundleSelection.fbt) || (product.is_sold_out && fbtProduct.is_sold_out)} 
+                                  className={`w-full md:w-auto px-8 py-4 font-bold uppercase tracking-widest whitespace-nowrap transition-all text-xs md:text-sm rounded shadow-[0_0_20px_rgba(197,160,89,0.2)] flex items-center justify-center gap-2 ${addedBothToCart ? "bg-green-800 text-white" : (!bundleSelection.main && !bundleSelection.fbt) || (product.is_sold_out && fbtProduct.is_sold_out) ? "bg-[#2a0808] text-[#e5d5a3]/30 cursor-not-allowed shadow-none" : "bg-[#c5a059] text-[#1a0505] hover:bg-[#e5d5a3]"}`}
                               >
                                   {addedBothToCart ? (<><CheckIcon className="w-4 h-4 animate-check" /> Added to Cart</>) : "Add Selected"}
                               </button>
