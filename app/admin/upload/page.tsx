@@ -1,7 +1,7 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 import { supabase } from '@/app/supabase'
@@ -13,9 +13,14 @@ function XIcon({ className="h-4 w-4" }) { return <svg className={className} fill
 function PlusIcon({ className="h-5 w-5" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg> }
 function ChevronDown({ className="h-4 w-4" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg> }
 
-export default function UploadPage() {
+// 🌟 PHASE 2.2: RENAME TO CONTENT COMPONENT FOR SUSPENSE BOUNDARY 🌟
+function UploadContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const editId = searchParams.get('id') // Detect Edit Mode
+
   const [loading, setLoading] = useState(false)
+  const [fetchingData, setFetchingData] = useState(!!editId)
   const [success, setSuccess] = useState(false)
   
   // Form State
@@ -23,7 +28,9 @@ export default function UploadPage() {
   const [price, setPrice] = useState("")
   const [category, setCategory] = useState("Necklaces")
   const [description, setDescription] = useState("")
-  const [imageFiles, setImageFiles] = useState<File[]>([])
+  
+  // 🌟 FIX: Array can hold null for existing DB images, and File for new uploads 🌟
+  const [imageFiles, setImageFiles] = useState<(File | null)[]>([])
   const [previewUrls, setPreviewUrls] = useState<string[]>([])
   
   // Custom Dropdown State
@@ -43,14 +50,46 @@ export default function UploadPage() {
         if (!session) router.push('/login')
     }
     checkUser()
-  }, [])
+  }, [router])
+
+  // 🌟 NEW: FETCH EXISTING DATA FOR EDIT MODE 🌟
+  useEffect(() => {
+    async function loadEditData() {
+        if (!editId) return
+        
+        try {
+            const { data, error } = await supabase.from('products').select('*').eq('id', editId).single()
+            if (error) throw error
+            
+            if (data) {
+                setName(data.name)
+                setPrice(data.price.toString())
+                setCategory(data.category)
+                setDescription(data.description || '')
+                
+                const existingImages = data.gallery && data.gallery.length > 0 ? data.gallery : [data.image_url]
+                const validImages = existingImages.filter(Boolean)
+                
+                setPreviewUrls(validImages)
+                // Fill imageFiles with 'null' to represent existing URLs
+                setImageFiles(new Array(validImages.length).fill(null))
+            }
+        } catch (error) {
+            console.error("Error loading product:", error)
+            alert("Could not load product details.")
+        } finally {
+            setFetchingData(false)
+        }
+    }
+    loadEditData()
+  }, [editId])
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files) {
           const filesArray = Array.from(e.target.files)
           const combinedFiles = [...imageFiles, ...filesArray].slice(0, 5)
           setImageFiles(combinedFiles)
-          const newPreviews = combinedFiles.map(file => URL.createObjectURL(file))
+          const newPreviews = [...previewUrls, ...filesArray.map(f => URL.createObjectURL(f))].slice(0, 5)
           setPreviewUrls(newPreviews)
       }
   }
@@ -59,6 +98,7 @@ export default function UploadPage() {
       const newFiles = [...imageFiles]
       newFiles.splice(index, 1)
       setImageFiles(newFiles)
+      
       const newPreviews = [...previewUrls]
       newPreviews.splice(index, 1)
       setPreviewUrls(newPreviews)
@@ -76,44 +116,66 @@ export default function UploadPage() {
 
   const handlePublish = async (e: React.FormEvent) => {
       e.preventDefault()
-      if (imageFiles.length === 0) { alert("Please upload at least one image."); return }
+      // Use previewUrls length since imageFiles contains nulls for existing images
+      if (previewUrls.length === 0) { alert("Please upload at least one image."); return }
       setLoading(true)
 
       try {
-          const uploadedImageUrls: string[] = []
-          for (const file of imageFiles) {
-              const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${file.name.replace(/[^a-zA-Z0-9]/g, '')}`
-              const { error } = await supabase.storage.from('jewelry-images').upload(fileName, file)
-              if (error) throw error
-              const { data: { publicUrl } } = supabase.storage.from('jewelry-images').getPublicUrl(fileName)
-              uploadedImageUrls.push(publicUrl)
+          const finalImageUrls: string[] = []
+          
+          for (let i = 0; i < previewUrls.length; i++) {
+              if (imageFiles[i]) {
+                  // It's a new file, upload it
+                  const file = imageFiles[i] as File
+                  const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}-${file.name.replace(/[^a-zA-Z0-9]/g, '')}`
+                  const { error } = await supabase.storage.from('jewelry-images').upload(fileName, file)
+                  if (error) throw error
+                  const { data: { publicUrl } } = supabase.storage.from('jewelry-images').getPublicUrl(fileName)
+                  finalImageUrls.push(publicUrl)
+              } else {
+                  // It's an existing URL from the DB, keep it
+                  finalImageUrls.push(previewUrls[i])
+              }
           }
 
-          const { error: dbError } = await supabase.from('products').insert({
+          const payload = {
               name,
               price: parseFloat(price),
               category,
               description,
-              image_url: uploadedImageUrls[0],
-              gallery: uploadedImageUrls,
-              rating: 5,
-              reviews: 0
-          })
+              image_url: finalImageUrls[0],
+              gallery: finalImageUrls,
+              // Only insert these defaults on Creation, NOT on Update
+              ...(editId ? {} : { rating: 5, reviews: 0 })
+          }
 
-          if (dbError) throw dbError
+          if (editId) {
+              // 🌟 EDIT MODE: UPDATE 🌟
+              const { error: dbError } = await supabase.from('products').update(payload).eq('id', editId)
+              if (dbError) throw dbError
+          } else {
+              // 🌟 CREATE MODE: INSERT 🌟
+              const { error: dbError } = await supabase.from('products').insert(payload)
+              if (dbError) throw dbError
+          }
+          
           setSuccess(true)
 
       } catch (error: any) {
           console.error(error)
-          alert("Error uploading: " + error.message)
+          alert("Error saving: " + error.message)
           setLoading(false)
       }
+  }
+
+  if (fetchingData) {
+      return <div className="min-h-screen bg-[#1a0505] flex items-center justify-center text-[#c5a059] font-serif">Loading Treasure Data...</div>
   }
 
   if (success) {
       return (
           <div className="min-h-screen bg-[#1a0505] flex flex-col items-center justify-center text-[#e5d5a3] animate-fade-in relative p-4">
-              <button onClick={() => router.push('/admin')} className="absolute top-8 right-8 text-[#e5d5a3]/50 hover:text-white"><XIcon className="h-8 w-8" /></button>
+              <button onClick={() => router.push('/admin/products')} className="absolute top-8 right-8 text-[#e5d5a3]/50 hover:text-white"><XIcon className="h-8 w-8" /></button>
               
               <div className="bg-[#2a0808] border border-[#c5a059] p-12 rounded-lg shadow-[0_0_40px_rgba(197,160,89,0.15)] text-center max-w-md w-full">
                   <div className="flex justify-center mb-6">
@@ -121,15 +183,17 @@ export default function UploadPage() {
                           <CheckCircle className="text-[#c5a059] h-10 w-10" /> 
                       </div>
                   </div>
-                  <h1 className="font-serif text-3xl text-[#f4e4bc] mb-2 tracking-wide">Published!</h1>
-                  <p className="text-[#e5d5a3]/60 mb-8 font-sans text-sm">"{name}" is now live in the store.</p>
+                  <h1 className="font-serif text-3xl text-[#f4e4bc] mb-2 tracking-wide">{editId ? 'Updated!' : 'Published!'}</h1>
+                  <p className="text-[#e5d5a3]/60 mb-8 font-sans text-sm">"{name}" {editId ? 'has been successfully updated.' : 'is now live in the store.'}</p>
                   
                   <div className="flex flex-col gap-3">
-                      <button onClick={resetForm} className="w-full bg-[#c5a059] text-[#1a0505] py-4 rounded text-xs font-bold uppercase tracking-widest hover:bg-white transition-all flex items-center justify-center gap-2 shadow-lg">
-                          <PlusIcon /> Add Another Treasure
-                      </button>
-                      <button onClick={() => router.push('/admin')} className="w-full border border-[#e5d5a3]/20 text-[#e5d5a3] py-4 rounded text-xs font-bold uppercase tracking-widest hover:bg-[#e5d5a3] hover:text-[#1a0505] transition-all">
-                          Back to Dashboard
+                      {!editId && (
+                          <button onClick={resetForm} className="w-full bg-[#c5a059] text-[#1a0505] py-4 rounded text-xs font-bold uppercase tracking-widest hover:bg-white transition-all flex items-center justify-center gap-2 shadow-lg">
+                              <PlusIcon /> Add Another Treasure
+                          </button>
+                      )}
+                      <button onClick={() => router.push('/admin/products')} className={`w-full ${editId ? 'bg-[#c5a059] text-[#1a0505] hover:bg-white shadow-lg' : 'border border-[#e5d5a3]/20 text-[#e5d5a3] hover:bg-[#e5d5a3] hover:text-[#1a0505]'} py-4 rounded text-xs font-bold uppercase tracking-widest transition-all`}>
+                          Back to Vault
                       </button>
                   </div>
               </div>
@@ -140,8 +204,8 @@ export default function UploadPage() {
   return (
     <div className="min-h-screen bg-[#1a0505] text-[#e5d5a3] font-sans p-8">
       <div className="max-w-4xl mx-auto flex items-center gap-4 mb-10">
-          <Link href="/admin" className="text-[#e5d5a3]/50 hover:text-white transition-colors"><ArrowLeft /></Link>
-          <h1 className="font-serif text-2xl text-[#f4e4bc]">Add New Treasure</h1>
+          <Link href="/admin/products" className="text-[#e5d5a3]/50 hover:text-white transition-colors"><ArrowLeft /></Link>
+          <h1 className="font-serif text-2xl text-[#f4e4bc]">{editId ? 'Edit Treasure Details' : 'Add New Treasure'}</h1>
       </div>
 
       <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -209,7 +273,6 @@ export default function UploadPage() {
 
                       {isDropdownOpen && (
                           <>
-                              {/* Invisible overlay to close dropdown when clicking outside */}
                               <div className="fixed inset-0 z-10" onClick={() => setIsDropdownOpen(false)}></div>
                               
                               <div className="absolute z-20 w-full mt-2 bg-[#1a0505] border border-[#c5a059]/40 rounded max-h-[300px] overflow-y-auto shadow-[0_10px_40px_rgba(0,0,0,0.8)] custom-scrollbar">
@@ -243,10 +306,19 @@ export default function UploadPage() {
                   <textarea required value={description} onChange={e => setDescription(e.target.value)} rows={5} placeholder="Write something emotional..." className="w-full bg-[#2a0808] border border-[#e5d5a3]/20 p-4 text-[#e5d5a3] focus:border-[#c5a059] outline-none rounded transition-all resize-none" />
               </div>
               <button disabled={loading} className="w-full bg-[#c5a059] text-[#1a0505] py-4 font-bold uppercase tracking-widest hover:bg-white transition-all shadow-[0_0_20px_rgba(197,160,89,0.3)] mt-4 disabled:opacity-50 disabled:cursor-not-allowed rounded">
-                  {loading ? "Publishing..." : "Publish Treasure"}
+                  {loading ? (editId ? "Saving..." : "Publishing...") : (editId ? "Save Changes" : "Publish Treasure")}
               </button>
           </form>
       </div>
     </div>
   )
+}
+
+// 🌟 PHASE 2.2: SUSPENSE BOUNDARY WRAPPER 🌟
+export default function UploadPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-[#1a0505] flex items-center justify-center text-[#c5a059] font-serif">Loading Vault Systems...</div>}>
+            <UploadContent />
+        </Suspense>
+    )
 }
