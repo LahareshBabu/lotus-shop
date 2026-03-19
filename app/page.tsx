@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation'
 // 1. CONFIGURATION
 import { supabase } from '@/app/supabase'
 
-// 🌟 HERO BANNER DEFAULT (Safety Net) 🌟
+// 🌟 HERO BANNER DEFAULT (Safety Net - Used ONLY for inheritance now) 🌟
 const DEFAULT_HERO = {
     tag: "Imitation Fine Jewelry",
     title_prefix: "Heritage Craftsmanship. ",
@@ -97,8 +97,7 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
   const [imgLoaded, setImgLoaded] = useState(false)
   const [isGlittering, setIsGlittering] = useState(false)
 
-  // 🌟 NEW: Calculate Discounted Price 🌟
-  const hasDiscount = product.discount_percentage && product.discount_percentage > 0;
+  const hasDiscount = Boolean(product.discount_percentage && product.discount_percentage > 0);
   const finalPrice = hasDiscount 
       ? Math.round(product.price - (product.price * (product.discount_percentage / 100))) 
       : product.price;
@@ -162,7 +161,6 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
             )}
         </Link>
 
-        {/* 🌟 NEW: DISCOUNT BADGE 🌟 */}
         {hasDiscount && !product.is_sold_out && (
             <span className="absolute left-3 top-3 bg-red-600/90 backdrop-blur-sm border border-red-500/50 px-2.5 py-1 font-sans text-[10px] font-bold uppercase text-white rounded-sm z-10 shadow-[0_0_15px_rgba(220,38,38,0.5)] tracking-wider">
                 {product.discount_percentage}% OFF
@@ -210,11 +208,10 @@ function ProductCard({ product, onAddToCart, isWishlisted, onToggleWishlist, ind
         <Link href={`/product/${product.id}`} className="hover:text-[#c5a059] transition-colors duration-300" onClick={() => trackInteraction('view')}>
             <h3 className="font-serif text-lg font-medium tracking-wide text-[#e5d5a3] line-clamp-1">{product.name}</h3>
         </Link>
-        <div className="flex items-center gap-2">
-            {/* 🌟 NEW: DISCOUNT PRICING DISPLAY 🌟 */}
-            <p className="font-sans text-base font-bold text-[#f4e4bc]">₹{finalPrice.toLocaleString("en-IN")}</p>
+        <div className="flex items-center gap-2.5">
+            <p className="font-sans text-lg font-bold text-[#f4e4bc]">₹{finalPrice.toLocaleString("en-IN")}</p>
             {hasDiscount && (
-                <p className="font-sans text-xs text-[#e5d5a3]/40 line-through">₹{product.price.toLocaleString("en-IN")}</p>
+                <p className="font-sans text-lg font-medium text-[#e5d5a3]/60 line-through decoration-red-500/70 decoration-2">₹{product.price.toLocaleString("en-IN")}</p>
             )}
         </div>
       </div>
@@ -245,46 +242,41 @@ export default function Page() {
 
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null)
 
-  // 🌟 NEW: LIVE BANNERS STATE 🌟
-  const [heroBanners, setHeroBanners] = useState<any[]>([DEFAULT_HERO])
+  // 🌟 NEW: FIXING THE HYDRATION FLASH 🌟
+  const [heroBanners, setHeroBanners] = useState<any[]>([]) // Start completely empty!
+  const [bannersLoaded, setBannersLoaded] = useState(false) // Track when Supabase finishes
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0)
 
-  // 🌟 NEW: Fetch Banners from Supabase 🌟
   useEffect(() => {
       async function fetchBanners() {
           const { data } = await supabase.from('hero_banners').select('*').order('created_at', { ascending: true });
           if (data && data.length > 0) {
               setHeroBanners(data);
+          } else {
+              // If the DB is completely empty, fallback to the default so the site doesn't break
+              setHeroBanners([DEFAULT_HERO]);
           }
+          setBannersLoaded(true); // Tell React it's safe to render!
       }
       fetchBanners();
   }, []);
 
-  // Auto-scroll the hero banner every 5 seconds
   useEffect(() => {
-      if (heroBanners.length <= 1) return; // Don't scroll if there's only 1 banner
+      if (!bannersLoaded || heroBanners.length <= 1) return; 
       const timer = setInterval(() => {
           setCurrentBannerIndex((prev) => (prev + 1) % heroBanners.length);
       }, 5000);
       return () => clearInterval(timer);
-  }, [heroBanners]);
+  }, [heroBanners, bannersLoaded]);
 
   // 🌟 FEATURED TREASURES FILTER STATE 🌟
   const [activeFilter, setActiveFilter] = useState('Featured Items')
 
-  // 🌟 DYNAMIC FILTER & SORT LOGIC (MAX 40 ITEMS) 🌟
   const displayedProducts = [...products].sort((a, b) => {
-      if (activeFilter === 'Newest Arrivals') {
-          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-      }
-      if (activeFilter === 'Hottest selling') {
-          // Fallback logic for demo purposes (e.g. price descending or an actual best_seller flag)
-          return (b.price || 0) - (a.price || 0); 
-      }
-      if (activeFilter === 'Highest Rated') {
-          return (b.rating || 5) - (a.rating || 5);
-      }
-      return 0; // 'Featured Items' (Default DB order)
+      if (activeFilter === 'Newest Arrivals') return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      if (activeFilter === 'Hottest selling') return (b.price || 0) - (a.price || 0); 
+      if (activeFilter === 'Highest Rated') return (b.rating || 5) - (a.rating || 5);
+      return 0; 
   }).slice(0, 40);
 
   useEffect(() => {
@@ -328,16 +320,11 @@ export default function Page() {
       document.addEventListener("mousedown", handleClickOutside); return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // 🌟 FORTRESS DATA SYNCHRONIZER 🌟
   useEffect(() => {
     async function init() {
         try {
             const { data: freshProducts, error } = await supabase.from('products').select('*');
-            
-            if (error) {
-                console.error("Supabase fetch failed", error);
-                return;
-            }
+            if (error) { console.error("Supabase fetch failed", error); return; }
 
             if (freshProducts) {
                 setProducts(freshProducts);
@@ -348,11 +335,8 @@ export default function Page() {
                     const freshData = freshProducts.find(p => p.id === item.id) || item; 
                     const existing = cleanCart.find(i => i.id === item.id);
                     const qty = (item.quantity !== undefined && !isNaN(item.quantity)) ? item.quantity : 1;
-                    if (existing) { 
-                        existing.quantity += qty;
-                    } else { 
-                        cleanCart.push({ ...item, ...freshData, quantity: qty }); 
-                    }
+                    if (existing) existing.quantity += qty;
+                    else cleanCart.push({ ...item, ...freshData, quantity: qty }); 
                 });
                 localStorage.setItem('cart', JSON.stringify(cleanCart)); 
                 setCart(cleanCart);
@@ -377,11 +361,10 @@ export default function Page() {
 
   const handleLogin = async (e: React.FormEvent) => { e.preventDefault(); setLoadingLogin(true); const { error } = await supabase.auth.signInWithOtp({ email }); if (error) { setLoginMessage("Error: " + error.message) } else { setLoginMessage("Magic Link sent! Check your email.") } setLoadingLogin(false) }
   
-  // 🌟 CLAUDE'S BULLETPROOF CART LOGIC 🌟
   const addToCart = (product: any) => { 
-      if (product.is_sold_out) return; // Safety lock
+      if (product.is_sold_out) return;
 
-      const hasDiscount = product.discount_percentage && product.discount_percentage > 0;
+      const hasDiscount = Boolean(product.discount_percentage && product.discount_percentage > 0);
       const finalPrice = hasDiscount 
           ? Math.round(product.price - (product.price * (product.discount_percentage / 100))) 
           : product.price;
@@ -389,7 +372,7 @@ export default function Page() {
       const payloadToSave = {
           ...product,
           original_price: product.price,
-          price: finalPrice // Cart relies on .price for totals
+          price: finalPrice 
       };
 
       const existingItemIndex = cart.findIndex(item => item.id === product.id)
@@ -397,7 +380,7 @@ export default function Page() {
       if (existingItemIndex > -1) {
           newCart = [...cart]
           newCart[existingItemIndex].quantity = (newCart[existingItemIndex].quantity || 1) + 1
-          newCart[existingItemIndex].price = finalPrice // Ensure latest price is set
+          newCart[existingItemIndex].price = finalPrice 
       } else {
           newCart = [...cart, { ...payloadToSave, quantity: 1 }]
       }
@@ -406,12 +389,25 @@ export default function Page() {
   }
 
   const toggleWishlist = (product: any) => { const exists = wishlist.find(i => i.id === product.id); let newW; if(exists) newW = wishlist.filter(i=>i.id!==product.id); else newW=[...wishlist, product]; setWishlist(newW); localStorage.setItem('wishlist', JSON.stringify(newW)) }
-  
   const cartTotal = cart.filter(i => !i.is_sold_out).reduce((t, i) => t + (i.price * (i.quantity || 1)), 0)
-  
   const scrollTo = (id: string) => { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); setMobileMenuOpen(false) }
   const updateQuantity = (i: number, c: number) => { const n = [...cart]; n[i].quantity = (n[i].quantity||1)+c; if(n[i].quantity<0)return; setCart(n); localStorage.setItem('cart', JSON.stringify(n)) }
   const removeFromCart = (i: number) => { const n = cart.filter((_, idx) => idx !== i); setCart(n); localStorage.setItem('cart', JSON.stringify(n)) }
+
+  // Determine active text statically to prevent floating animation
+  const activeTextSource = (() => {
+      if (heroBanners.length === 0) return DEFAULT_HERO;
+      const current = heroBanners[currentBannerIndex];
+      const isCurrentEmpty = !current.title_prefix && !current.title_highlight && !current.title_suffix;
+      return isCurrentEmpty && heroBanners[0] ? heroBanners[0] : current;
+  })();
+
+  const activeTag = activeTextSource.tag || DEFAULT_HERO.tag;
+  const activePrefix = activeTextSource.title_prefix || DEFAULT_HERO.title_prefix;
+  const activeHighlight = activeTextSource.title_highlight || DEFAULT_HERO.title_highlight;
+  const activeSuffix = activeTextSource.title_suffix || DEFAULT_HERO.title_suffix;
+  const activeDesc = activeTextSource.desc_text || DEFAULT_HERO.desc_text;
+  const activeBtn = activeTextSource.btn_text || DEFAULT_HERO.btn_text;
 
   return (
     <main className="min-h-screen bg-[#1a0505] text-[#e5d5a3] relative font-sans">
@@ -426,15 +422,15 @@ export default function Page() {
           animation: fadeUpStagger 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           opacity: 0;
         }
-        @keyframes loadingBar {
-          0% { width: 0%; }
-          100% { width: 100%; }
-        }
+        .animate-hero-1 { animation: fadeUpStagger 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+        .animate-hero-2 { animation: fadeUpStagger 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards; opacity: 0; }
+        .animate-hero-3 { animation: fadeUpStagger 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards; opacity: 0; }
+        .animate-hero-btn { animation: fadeUpStagger 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards; opacity: 0; }
+        @keyframes loadingBar { 0% { width: 0%; } 100% { width: 100%; } }
       `}} />
 
       <header className="sticky top-0 z-40 bg-[#1a0505]/95 backdrop-blur-md transition-all duration-500 shadow-lg" onMouseLeave={() => setHoveredCategory(null)}>
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 lg:px-8 gap-8 relative z-50">
-          
           <button onClick={() => scrollTo('hero')} className="flex items-center gap-2">
             <span className="font-serif text-2xl font-bold tracking-[0.2em] lg:text-3xl text-gradient bg-clip-text text-transparent bg-gradient-to-r from-[#e5d5a3] via-[#fbf5e6] to-[#c5a059] text-[#e5d5a3]">LOTUS</span>
           </button>
@@ -491,15 +487,8 @@ export default function Page() {
         <div className="border-t border-[#e5d5a3]/5 bg-[#2a0808]/30 backdrop-blur-sm relative">
             <div className="mx-auto max-w-7xl px-4 flex justify-center gap-8 md:gap-16">
                 {MEGA_MENU.map((category) => (
-                    <div 
-                        key={category.name}
-                        onMouseEnter={() => setHoveredCategory(category.name)}
-                        className="py-4"
-                    >
-                        <Link 
-                            href={`/shop/${category.slug}`}
-                            className={`text-xs md:text-sm uppercase tracking-[0.15em] hover:text-[#c5a059] hover:font-bold transition-all relative block ${hoveredCategory === category.name ? 'text-[#c5a059] font-bold' : 'text-[#e5d5a3]/70'}`}
-                        >
+                    <div key={category.name} onMouseEnter={() => setHoveredCategory(category.name)} className="py-4">
+                        <Link href={`/shop/${category.slug}`} className={`text-xs md:text-sm uppercase tracking-[0.15em] hover:text-[#c5a059] hover:font-bold transition-all relative block ${hoveredCategory === category.name ? 'text-[#c5a059] font-bold' : 'text-[#e5d5a3]/70'}`}>
                             {category.name}
                             <span className={`absolute bottom-[-17px] left-1/2 -translate-x-1/2 h-0.5 bg-[#c5a059] transition-all duration-300 ease-out ${hoveredCategory === category.name ? 'w-full' : 'w-0'}`}></span>
                         </Link>
@@ -553,7 +542,6 @@ export default function Page() {
                       <div className="flex-1">
                           <p className="text-sm text-[#e5d5a3] font-serif">{item.name}</p>
                           <p className="text-xs text-[#e5d5a3]/60">
-                              {/* Show final discounted price in Wishlist too */}
                               ₹{Math.round(item.price - (item.price * ((item.discount_percentage || 0) / 100))).toLocaleString("en-IN")}
                           </p>
                       </div>
@@ -585,7 +573,6 @@ export default function Page() {
                   <div key={idx} className="flex gap-4 bg-[#1a0505]/50 p-3 rounded border border-[#e5d5a3]/10">
                       <div className="h-16 w-16 bg-[#1a0505] flex-shrink-0 overflow-hidden rounded-sm border border-[#e5d5a3]/10 relative">
                           {item.image_url && <img src={item.image_url} className="h-full w-full object-cover" />}
-                          {/* Mini Cart Badge */}
                           {item.discount_percentage > 0 && <span className="absolute top-0 left-0 bg-red-600 text-white text-[8px] font-bold px-1 py-0.5 rounded-br-sm">{item.discount_percentage}% OFF</span>}
                       </div>
                       <div className="flex-1 flex flex-col justify-between">
@@ -615,76 +602,68 @@ export default function Page() {
           </div>
       </div>
 
-      {/* 🌟 JIOHOTSTAR STYLE HERO CAROUSEL w/ Fallback Logic 🌟 */}
+      {/* 🌟 FIX: HYDRATION FLASH PREVENTED WITH SMOOTH FADE IN 🌟 */}
       <section id="hero" className="relative overflow-hidden bg-[#1a0505] min-h-[600px] lg:min-h-[800px] border-b border-[#e5d5a3]/10 flex items-center justify-center">
         
-        {heroBanners.map((banner, idx) => {
-            // 🌟 SMART FALLBACK LOGIC: If custom text is empty, inherit from Primary Banner (Index 0) or DEFAULT_HERO
-            const isTextEmpty = !banner.title_prefix && !banner.title_highlight && !banner.title_suffix;
-            const sourceBanner = isTextEmpty && heroBanners[0] ? heroBanners[0] : banner;
+        {/* Loading State Background (Shown only until banners arrive from DB) */}
+        {!bannersLoaded && (
+            <div className="absolute inset-0 z-20 bg-[#1a0505] animate-pulse"></div>
+        )}
 
-            const finalTag = banner.tag || sourceBanner.tag || DEFAULT_HERO.tag;
-            const finalPrefix = isTextEmpty ? (sourceBanner.title_prefix || DEFAULT_HERO.title_prefix) : banner.title_prefix;
-            const finalHighlight = isTextEmpty ? (sourceBanner.title_highlight || DEFAULT_HERO.title_highlight) : banner.title_highlight;
-            const finalSuffix = isTextEmpty ? (sourceBanner.title_suffix || DEFAULT_HERO.title_suffix) : banner.title_suffix;
-            const finalDesc = banner.desc_text || sourceBanner.desc_text || DEFAULT_HERO.desc_text;
-            const finalBtn = banner.btn_text || sourceBanner.btn_text || DEFAULT_HERO.btn_text;
-
-            return (
+        {/* The Real Banners (Fade in only after loaded) */}
+        <div className={`absolute inset-0 transition-opacity duration-1000 ${bannersLoaded ? 'opacity-100' : 'opacity-0'}`}>
+            {heroBanners.map((banner, idx) => (
                 <div 
-                    key={idx} 
+                    key={`img-${idx}`} 
                     className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${currentBannerIndex === idx ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}
                 >
                     <div className="absolute inset-0 z-0">
                         <img src={banner.image_url} alt="Royal Jewelry Background" className="h-full w-full object-cover opacity-40" />
                         <div className="absolute inset-0 bg-gradient-to-t from-[#1a0505] via-[#2a0808]/60 to-[#1a0505]/30" />
                     </div>
-                    
-                    <div className="relative mx-auto flex max-w-7xl flex-col items-center text-center px-6 lg:px-8 z-10 h-full justify-center pt-32 lg:pt-40">
-                        {finalTag && (
-                            <span className={`mb-6 inline-block border border-[#c5a059]/60 px-6 py-2 font-sans text-xs font-bold uppercase tracking-[0.3em] text-[#c5a059] drop-shadow-md rounded ${currentBannerIndex === idx ? 'animate-hero-1' : ''}`}>
-                                {finalTag}
-                            </span>
-                        )}
-                        <h1 className={`max-w-6xl font-serif text-5xl font-medium leading-tight tracking-wide text-[#f4e4bc] md:text-6xl lg:text-7xl drop-shadow-lg ${currentBannerIndex === idx ? 'animate-hero-2' : ''}`}>
-                            {finalPrefix} <span className="text-[#c5a059] italic">{finalHighlight}</span> {finalSuffix}
-                        </h1>
-                        <p className={`mt-8 max-w-xl font-sans text-sm leading-relaxed text-[#e5d5a3]/90 md:text-base drop-shadow-md ${currentBannerIndex === idx ? 'animate-hero-3' : ''}`}>
-                            {finalDesc}
-                        </p>
-                        <div className={`mt-12 flex flex-col sm:flex-row gap-4 ${currentBannerIndex === idx ? 'animate-hero-btn' : ''}`}>
-                            <button onClick={() => scrollTo('featured')} className="inline-flex items-center justify-center gap-2 bg-transparent border border-[#c5a059] px-10 py-4 font-sans text-xs font-bold uppercase tracking-[0.2em] text-[#c5a059] transition-all hover:bg-[#c5a059] hover:text-[#1a0505] hover:shadow-[0_0_20px_rgba(197,160,89,0.3)] cursor-pointer rounded">
-                                {finalBtn}
-                            </button>
-                        </div>
-                    </div>
                 </div>
-            )
-        })}
+            ))}
 
-        {/* 🌟 JIOHOTSTAR BOTTOM-RIGHT THUMBNAIL CONTROLS 🌟 */}
-        {heroBanners.length > 1 && (
-            <div className="absolute bottom-6 right-6 lg:bottom-12 lg:right-12 z-30 flex items-center gap-2 bg-[#1a0505]/80 backdrop-blur-md p-2 rounded border border-[#e5d5a3]/10 shadow-2xl">
-                {heroBanners.map((banner, idx) => (
-                    <button
-                        key={idx}
-                        onClick={() => setCurrentBannerIndex(idx)}
-                        className={`relative h-12 w-20 lg:h-16 lg:w-28 overflow-hidden rounded border transition-all duration-300 ${
-                            currentBannerIndex === idx 
-                            ? 'border-[#c5a059] opacity-100 shadow-[0_0_15px_rgba(197,160,89,0.5)]' 
-                            : 'border-transparent opacity-40 hover:opacity-100'
-                        }`}
-                    >
-                        <img src={banner.image_url} className="absolute inset-0 w-full h-full object-cover" />
-                        
-                        {/* Animated Progress Bar on Active Thumbnail */}
-                        {currentBannerIndex === idx && (
-                            <div className="absolute bottom-0 left-0 h-1 bg-[#c5a059] animate-[loadingBar_5s_linear_infinite]"></div>
-                        )}
+            <div className="relative mx-auto flex max-w-7xl flex-col items-center text-center px-6 lg:px-8 z-20 h-full justify-center pt-32 lg:pt-40">
+                {activeTag && (
+                    <span className="mb-6 inline-block border border-[#c5a059]/60 px-6 py-2 font-sans text-xs font-bold uppercase tracking-[0.3em] text-[#c5a059] drop-shadow-md rounded animate-hero-1">
+                        {activeTag}
+                    </span>
+                )}
+                <h1 className="max-w-6xl font-serif text-5xl font-medium leading-tight tracking-wide text-[#f4e4bc] md:text-6xl lg:text-7xl drop-shadow-lg animate-hero-2">
+                    {activePrefix} <span className="text-[#c5a059] italic">{activeHighlight}</span> {activeSuffix}
+                </h1>
+                <p className="mt-8 max-w-xl font-sans text-sm leading-relaxed text-[#e5d5a3]/90 md:text-base drop-shadow-md animate-hero-3">
+                    {activeDesc}
+                </p>
+                <div className="mt-12 flex flex-col sm:flex-row gap-4 animate-hero-btn">
+                    <button onClick={() => scrollTo('featured')} className="inline-flex items-center justify-center gap-2 bg-transparent border border-[#c5a059] px-10 py-4 font-sans text-xs font-bold uppercase tracking-[0.2em] text-[#c5a059] transition-all hover:bg-[#c5a059] hover:text-[#1a0505] hover:shadow-[0_0_20px_rgba(197,160,89,0.3)] cursor-pointer rounded">
+                        {activeBtn}
                     </button>
-                ))}
+                </div>
             </div>
-        )}
+
+            {heroBanners.length > 1 && (
+                <div className="absolute bottom-6 right-6 lg:bottom-12 lg:right-12 z-30 flex items-center gap-2 bg-[#1a0505]/80 backdrop-blur-md p-2 rounded border border-[#e5d5a3]/10 shadow-2xl animate-fade-in">
+                    {heroBanners.map((banner, idx) => (
+                        <button
+                            key={idx}
+                            onClick={() => setCurrentBannerIndex(idx)}
+                            className={`relative h-12 w-20 lg:h-16 lg:w-28 overflow-hidden rounded border transition-all duration-300 ${
+                                currentBannerIndex === idx 
+                                ? 'border-[#c5a059] opacity-100 shadow-[0_0_15px_rgba(197,160,89,0.5)]' 
+                                : 'border-transparent opacity-40 hover:opacity-100'
+                            }`}
+                        >
+                            <img src={banner.image_url} className="absolute inset-0 w-full h-full object-cover" />
+                            {currentBannerIndex === idx && (
+                                <div className="absolute bottom-0 left-0 h-1 bg-[#c5a059] animate-[loadingBar_5s_linear_infinite]"></div>
+                            )}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
       </section>
 
       <section id="featured" className="py-24 px-4 max-w-7xl mx-auto reveal-on-scroll">

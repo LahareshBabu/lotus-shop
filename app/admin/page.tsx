@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -17,6 +17,9 @@ function WarningIcon({ className="h-12 w-12" }) { return <svg className={classNa
 function CheckCircleIcon({ className="h-5 w-5" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> }
 function PlusIcon({ className="h-4 w-4" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg> }
 function SparklesIcon({ className="h-4 w-4" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg> }
+function ChevronDownIcon({ className="h-4 w-4" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg> }
+function ImageGalleryIcon({ className="h-4 w-4" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> }
+function ListIcon({ className="h-4 w-4" }) { return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg> }
 
 function AdminContent() {
   const router = useRouter()
@@ -41,6 +44,21 @@ function AdminContent() {
   const [activeView, setActiveView] = useState<'business' | 'ml'>('business')
   const [mlStats, setMlStats] = useState<any>(null)
   const [fbtRules, setFbtRules] = useState<any[]>([])
+
+  // 🌟 NEW: DROPDOWN STATE 🌟
+  const [isStoreSettingsOpen, setIsStoreSettingsOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+          if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+              setIsStoreSettingsOpen(false)
+          }
+      }
+      document.addEventListener("mousedown", handleClickOutside)
+      return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
 
   useEffect(() => {
     async function init() {
@@ -430,28 +448,43 @@ function AdminContent() {
               </button>
           </div>
 
-          <div className="flex gap-4 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
-              {!isHistoryMode && (
-                  <Link href="/admin/upload" className="shrink-0 bg-[#c5a059] text-[#1a0505] px-6 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-white transition-all shadow-[0_0_15px_rgba(197,160,89,0.3)] flex items-center gap-2">
-                      <PlusIcon className="h-4 w-4" /> Add Product
-                  </Link>
-              )}
+          <div className="flex gap-4 w-full md:w-auto overflow-visible pb-2 md:pb-0 relative">
               
-              <Link href="/admin/products" className="shrink-0 bg-[#1a0505] border border-[#e5d5a3]/30 text-[#e5d5a3] px-6 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-[#e5d5a3] hover:text-[#1a0505] transition-all flex items-center">
-                  All Products
-              </Link>
+              {/* 🌟 NEW: CONSOLIDATED STORE SETTINGS DROPDOWN 🌟 */}
+              {!isHistoryMode && (
+                  <div className="relative" ref={dropdownRef}>
+                      <button 
+                          onClick={() => setIsStoreSettingsOpen(!isStoreSettingsOpen)}
+                          className="shrink-0 bg-[#1a0505] border border-[#e5d5a3]/30 text-[#e5d5a3] px-6 py-2.5 rounded text-xs font-bold uppercase tracking-widest hover:border-[#c5a059] hover:text-[#c5a059] transition-all flex items-center gap-2"
+                      >
+                          Store Settings <ChevronDownIcon className={`h-4 w-4 transition-transform duration-300 ${isStoreSettingsOpen ? 'rotate-180' : ''}`} />
+                      </button>
 
-              {/* 🌟 THE FIX: Button points to the exact banner folder you made! 🌟 */}
-              <Link href="/admin/banner" className="shrink-0 bg-[#1a0505] border border-[#e5d5a3]/30 text-[#e5d5a3] px-6 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-[#e5d5a3] hover:text-[#1a0505] transition-all flex items-center">
-                  Manage Banners
-              </Link>
+                      {isStoreSettingsOpen && (
+                          <div className="absolute top-full right-0 mt-2 w-56 bg-[#1a0505] border border-[#c5a059]/40 rounded-lg shadow-[0_10px_40px_rgba(0,0,0,0.8)] z-50 overflow-hidden animate-fade-in">
+                              <Link href="/admin/upload" className="flex items-center gap-3 px-4 py-3 hover:bg-[#2a0808] transition-colors border-b border-[#e5d5a3]/10 text-[#e5d5a3] group">
+                                  <PlusIcon className="h-4 w-4 text-[#c5a059] group-hover:scale-110 transition-transform" />
+                                  <span className="text-xs uppercase tracking-widest font-bold">Add Product</span>
+                              </Link>
+                              <Link href="/admin/products" className="flex items-center gap-3 px-4 py-3 hover:bg-[#2a0808] transition-colors border-b border-[#e5d5a3]/10 text-[#e5d5a3] group">
+                                  <ListIcon className="h-4 w-4 text-[#c5a059] group-hover:scale-110 transition-transform" />
+                                  <span className="text-xs uppercase tracking-widest font-bold">All Products</span>
+                              </Link>
+                              <Link href="/admin/banner" className="flex items-center gap-3 px-4 py-3 hover:bg-[#2a0808] transition-colors text-[#e5d5a3] group">
+                                  <ImageGalleryIcon className="h-4 w-4 text-[#c5a059] group-hover:scale-110 transition-transform" />
+                                  <span className="text-xs uppercase tracking-widest font-bold">Manage Banners</span>
+                              </Link>
+                          </div>
+                      )}
+                  </div>
+              )}
 
               {isHistoryMode && (
                   <Link href="/admin" className="shrink-0 text-xs uppercase tracking-widest text-[#c5a059] border border-[#c5a059] px-6 py-2 rounded hover:bg-[#c5a059] hover:text-[#1a0505] transition-all">
                       ← Back to Dashboard
                   </Link>
               )}
-              <Link href="/admin/history" className="shrink-0 bg-[#1a0505] border border-[#c5a059] text-[#c5a059] px-6 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-[#c5a059] hover:text-[#1a0505] transition-all">View History</Link>
+              <Link href="/admin/history" className="shrink-0 bg-[#1a0505] border border-[#c5a059] text-[#c5a059] px-6 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-[#c5a059] hover:text-[#1a0505] transition-all flex items-center">View History</Link>
               {!isHistoryMode && (
                   <button onClick={() => setShowEndCycleModal(true)} className="shrink-0 bg-red-900/20 border border-red-500/50 text-red-400 px-6 py-2 rounded text-xs font-bold uppercase tracking-widest hover:bg-red-900/50 hover:border-red-500 transition-all">End Cycle</button>
               )}

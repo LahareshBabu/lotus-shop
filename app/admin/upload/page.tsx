@@ -179,7 +179,7 @@ function UploadContent() {
   if (success) {
       return (
           <div className="min-h-screen bg-[#1a0505] flex flex-col items-center justify-center text-[#e5d5a3] animate-fade-in relative p-4">
-              <button onClick={() => router.push('/admin/products')} className="absolute top-8 right-8 text-[#e5d5a3]/50 hover:text-white"><XIcon className="h-8 w-8" /></button>
+              <button onClick={() => router.push(editId ? '/admin/products' : '/admin')} className="absolute top-8 right-8 text-[#e5d5a3]/50 hover:text-white"><XIcon className="h-8 w-8" /></button>
               
               <div className="bg-[#2a0808] border border-[#c5a059] p-12 rounded-lg shadow-[0_0_40px_rgba(197,160,89,0.15)] text-center max-w-md w-full">
                   <div className="flex justify-center mb-6">
@@ -196,8 +196,8 @@ function UploadContent() {
                               <PlusIcon className="h-5 w-5" /> Add Another Treasure
                           </button>
                       )}
-                      <button onClick={() => router.push('/admin/products')} className={`w-full ${editId ? 'bg-[#c5a059] text-[#1a0505] hover:bg-white shadow-lg' : 'border border-[#e5d5a3]/20 text-[#e5d5a3] hover:bg-[#e5d5a3] hover:text-[#1a0505]'} py-4 rounded text-xs font-bold uppercase tracking-widest transition-all`}>
-                          Back to Vault
+                      <button onClick={() => router.push(editId ? '/admin/products' : '/admin')} className={`w-full ${editId ? 'bg-[#c5a059] text-[#1a0505] hover:bg-white shadow-lg' : 'border border-[#e5d5a3]/20 text-[#e5d5a3] hover:bg-[#e5d5a3] hover:text-[#1a0505]'} py-4 rounded text-xs font-bold uppercase tracking-widest transition-all`}>
+                          Back to {editId ? 'Vault' : 'Dashboard'}
                       </button>
                   </div>
               </div>
@@ -208,7 +208,10 @@ function UploadContent() {
   return (
     <div className="min-h-screen bg-[#1a0505] text-[#e5d5a3] font-sans p-8">
       <div className="max-w-4xl mx-auto flex items-center gap-4 mb-10">
-          <Link href="/admin/products" className="text-[#e5d5a3]/50 hover:text-white transition-colors"><ArrowLeft className="h-6 w-6" /></Link>
+          {/* 🌟 FIX: Dynamic Back Button Routing 🌟 */}
+          <Link href={editId ? "/admin/products" : "/admin"} className="text-[#e5d5a3]/50 hover:text-white transition-colors">
+              <ArrowLeft className="h-6 w-6" />
+          </Link>
           <h1 className="font-serif text-2xl text-[#f4e4bc]">{editId ? 'Edit Treasure Details' : 'Add New Treasure'}</h1>
       </div>
 
